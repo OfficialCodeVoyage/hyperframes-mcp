@@ -206,7 +206,7 @@ def test_a_breaker_that_is_open_refused_the_job_before_anything_was_sent(tmp_pat
         provider_name, model = "fal", "fal-ai/nano-banana-2"
 
         async def generate(self, prompt, preset="draft"):
-            raise CircuitBreakerError(CircuitBreaker(name="fal_image"))
+            raise CircuitBreakerError(CircuitBreaker(name="hyperframes_mcp.fal_image"))
 
     with pytest.raises(CircuitBreakerError) as caught:
         asyncio.run(generate.make_picture("x", tmp_path / "a.jpg", client=Open()))

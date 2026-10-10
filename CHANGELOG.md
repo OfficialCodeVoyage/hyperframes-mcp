@@ -5,6 +5,13 @@ All notable changes. The format follows [Keep a Changelog](https://keepachangelo
 
 ## [Unreleased]
 
+## [0.1.2]
+
+### Fixed
+- The picture clients' circuit breakers were named `openai_image` and `fal_image`, the names a host project may already
+  use; the breaker registry is keyed by name, so the package's breakers replaced the host's and the host's own reset of
+  its breakers skipped them. They are now `hyperframes_mcp.openai_image` and `hyperframes_mcp.fal_image`.
+
 ## [0.1.1]
 
 ### Added

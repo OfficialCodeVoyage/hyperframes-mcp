@@ -224,7 +224,7 @@ class FalImageClient:
         failure_threshold=3,
         recovery_timeout=120,
         expected_exception=FalServerError,
-        name="fal_image",
+        name="hyperframes_mcp.fal_image",
     )
     async def _run_job(self, prompt: str, preset: str) -> AIImageResult:
         """Circuit-breaker-protected job: submit, poll, fetch the result, download."""

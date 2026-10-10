@@ -103,7 +103,7 @@ class AIImageClient:
     @circuit(
         failure_threshold=3,
         recovery_timeout=120,
-        name="openai_image",
+        name="hyperframes_mcp.openai_image",
         expected_exception=(openai.InternalServerError, openai.APIConnectionError),
     )
     async def _call_with_circuit_breaker(self, prompt: str, preset: str) -> AIImageResult:
