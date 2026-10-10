@@ -1,5 +1,32 @@
 # hyperframes-mcp
 
+## **Install: pass this to your Claude Code or your agent**
+
+**Copy the prompt below and paste it into Claude Code (or any agent that can run shell commands on your Mac). It checks
+what is needed, installs hyperframes-mcp and connects it to Claude Code.**
+
+```text
+Install hyperframes-mcp (https://github.com/OfficialCodeVoyage/hyperframes-mcp) and connect it to Claude Code on this Mac.
+
+First check what it needs and tell me what is missing, instead of installing anything silently: macOS, the HyperFrames
+desktop app, Python 3.11 or newer, Node.js 22 or newer, ffmpeg with ffprobe, and uv (https://docs.astral.sh/uv/).
+
+Then run these one at a time and show me each result:
+  uv tool install "git+https://github.com/OfficialCodeVoyage/hyperframes-mcp@v0.1.0"
+  hyperframes-mcp setup
+  hyperframes-mcp register
+  hyperframes-mcp doctor
+
+Never read, print or ask me for an API key or the HyperFrames app's token. If I want paid pictures and clips, show me
+this command so I run it myself and type the key at its prompt (a fal.ai key):
+  security add-generic-password -s hyperframes-mcp -a FAL_KEY -w
+
+At the end tell me what doctor flagged, one line each with what to do about it, and remind me to quit the HyperFrames
+app completely (Cmd+Q) and open it again, because the app's chat loads MCP servers only when it starts.
+```
+
+Prefer to type the commands yourself? See [Install](#install) below.
+
 An [MCP](https://modelcontextprotocol.io) server that lets **Claude Code edit a HyperFrames project while you edit the
 same project by hand in the HyperFrames desktop app.** You trim a clip, Claude fixes the credit line over it; both of you
 work on one timeline, and every change Claude makes is an entry in the app's own history that you can undo.
@@ -142,19 +169,7 @@ sets the loudness of the file you export.
 ## Prompts to copy into your AI agent
 
 Paste any of these into Claude Code, or into the HyperFrames app's chat once the server is registered and the app has been
-restarted. Replace what is in `<angle brackets>`. The tools named are the ones in [Available tools](#available-tools).
-
-**Install it and connect it to Claude Code**
-
-```text
-Install hyperframes-mcp and connect it to Claude Code. Run these one at a time and show me each result:
-  uv tool install "git+https://github.com/OfficialCodeVoyage/hyperframes-mcp@v0.1.0"
-  hyperframes-mcp setup
-  hyperframes-mcp register
-  hyperframes-mcp doctor
-Never read, print or ask me for an API key or the HyperFrames app's token. Then tell me what doctor flagged, one line
-each with what to do about it, and remind me to quit the HyperFrames app completely (Cmd+Q) and open it again.
-```
+restarted. Replace what is in `<angle brackets>`. The tools named are the ones in [Available tools](#available-tools); to install, use the prompt at the top.
 
 **Start a session**
 
