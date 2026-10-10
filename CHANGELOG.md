@@ -18,7 +18,7 @@ First public release, extracted from a private video project.
   (`examples/hello`).
 - Free media: search and fetch from the Library of Congress, Wikimedia Commons, the Internet Archive and Openverse with
   a licence record per file; an icon subset and vector tools.
-- Paid pictures and clips with your own OpenAI and fal.ai keys, quoted first and confirmed second.
+- Paid pictures and clips with your own fal.ai key (Nano Banana 2 for pictures; OpenAI models can be configured), quoted first and confirmed second.
 - Spend safety (`docs/spend-safety.md`): per-call, per-video and per-day dollar limits, call-count limits, a hold for a
   call that may have been billed, tighten-only environment variables, a freeze switch.
 - `hyperframes-mcp register | setup | doctor | spend | adopt | new-chat`, a Claude Code plugin manifest, and

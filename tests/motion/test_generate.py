@@ -233,11 +233,14 @@ def test_a_picture_is_drawn_in_the_style_of_the_profile_it_is_for(tmp_path, prof
     assert other.calls[0][0] == generate.picture_prompt("a vault")
 
 
-def test_a_picture_without_a_key_says_which_key_and_writes_nothing(tmp_path):
+def test_a_picture_without_a_key_says_which_key_and_writes_nothing(tmp_path, monkeypatch):
     out = tmp_path / "vault.png"
 
-    with pytest.raises(generate.GenerateError, match="OPENAI_API_KEY"):
+    with pytest.raises(generate.GenerateError, match="FAL_KEY"):
         asyncio.run(generate.make_picture("x", out, client=FakeImages(None)))
+    monkeypatch.delenv("FAL_KEY", raising=False)
+    with pytest.raises(generate.GenerateError, match="FAL_KEY"):  # no client given: the provider's own, no key
+        asyncio.run(generate.make_picture("x", out))
     assert not out.exists()
 
 

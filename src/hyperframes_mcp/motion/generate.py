@@ -24,6 +24,7 @@ import tempfile
 from datetime import UTC, datetime
 from pathlib import Path
 
+from circuitbreaker import CircuitBreakerError
 from PIL import Image, ImageOps
 
 from hyperframes_mcp.motion import sheet
@@ -31,7 +32,7 @@ from hyperframes_mcp.motion.manifest import Canvas, default_canvas
 from hyperframes_mcp.motion.profiles import DEFAULT_PROFILE, load_profile
 from hyperframes_mcp.motion.project_edit import AI_CREDIT, PICTURE_QUALITIES
 from hyperframes_mcp.providers.bounded_fetch import save_shrunk_jpeg
-from hyperframes_mcp.providers.image.client import AIImageClient
+from hyperframes_mcp.providers.image.providers import ImageClient, create_image_client, get_provider
 from hyperframes_mcp.providers.image.settings import (
     ImagePreset,
     ImageSettings,
@@ -51,8 +52,11 @@ from hyperframes_mcp.qa.media import first_stream, probe_media, resolve_tools, r
 from hyperframes_mcp.qa.models import QAToolError, UnreadableMediaError
 from hyperframes_mcp.util.atomic import atomic_write_bytes
 
-PICTURE_MODEL = "gpt-image-2.5-flare"  # what the gold-8min stills used
-PICTURE_SIZE = "2048x1152"
+PICTURE_PROVIDER = "fal"
+PICTURE_MODEL = "fal-ai/nano-banana-2"  # Google's Nano Banana 2 on fal: one FAL_KEY for pictures and clips
+# What each quality draws, 16:9 like the canvas: "medium" is the 1K tier (about 1376 px wide), "high" the 2K tier
+# (2752 px wide, sharper than the 1920x1080 canvas it is fitted to). Their prices are in config/settings.yaml.
+PICTURE_SIZES = {"medium": "1376x768", "high": "2752x1536"}
 FULL_BLEED = (
     " Full-bleed composition that fills the whole frame to its edges: no border, no paper margin,"
     " no frame, no vignette frame."
@@ -74,11 +78,11 @@ class GenerateError(RuntimeError):
 
 
 def picture_settings() -> ImageSettings:
-    presets = {"draft": ImagePreset(quality="low", size=PICTURE_SIZE)} | {
-        quality: ImagePreset(quality=quality, size=PICTURE_SIZE) for quality in PICTURE_QUALITIES
+    presets = {"draft": ImagePreset(quality="low", size=PICTURE_SIZES["medium"])} | {
+        quality: ImagePreset(quality=quality, size=PICTURE_SIZES[quality]) for quality in PICTURE_QUALITIES
     }
     return ImageSettings(
-        provider="openai",
+        provider=PICTURE_PROVIDER,
         model=PICTURE_MODEL,
         presets=presets,
         pricing=load_image_settings().pricing,
@@ -190,7 +194,7 @@ async def make_picture(
     quality: str = "high",
     profile_name: str = DEFAULT_PROFILE,
     canvas: Canvas | None = None,
-    client: AIImageClient | None = None,
+    client: ImageClient | None = None,
 ) -> dict:
     """Make one picture of ``request`` in the style of profile ``profile_name`` into ``out`` (a paid call), fitted to
     ``canvas`` (default: the motion tokens' 1920x1080) and written as a JPEG or PNG by its suffix, and write its record
@@ -201,10 +205,16 @@ async def make_picture(
     """
     picture_format(out)
     prompt = picture_prompt(request, profile_name)
-    client = client or AIImageClient(api_key=os.environ.get("OPENAI_API_KEY"), settings=picture_settings())
-    result = await client.generate(prompt, quality)
+    settings = picture_settings()
+    client = client or create_image_client(settings)
+    try:
+        result = await client.generate(prompt, quality) if client else None
+    except CircuitBreakerError as error:
+        error.may_be_billed = False  # the breaker refused the job before anything was sent
+        raise
     if result is None:
-        raise GenerateError("OPENAI_API_KEY is not set (environment or the repository's .env)")
+        key = get_provider(settings.provider).api_key_env
+        raise GenerateError(f"{key} is not set (environment, ~/.hyperframes-mcp/config/.env or the Keychain)")
     try:  # the provider has answered: whatever fails from here on, the picture was paid for
         out.parent.mkdir(parents=True, exist_ok=True)
         data, (width, height) = await asyncio.to_thread(fit_picture, result.image_bytes, picture_format(out), canvas)

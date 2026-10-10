@@ -247,7 +247,7 @@ async def test_a_failure_after_the_provider_answered_is_held_not_released(projec
 
 @pytest.mark.asyncio
 async def test_the_day_is_read_after_the_wait_for_the_lock_not_before(project, paid, tmp_path, monkeypatch):
-    limits_file(tmp_path, monkeypatch, "spend:\n  all_projects_per_day_usd: 0.07\n")
+    limits_file(tmp_path, monkeypatch, f"spend:\n  all_projects_per_day_usd: {PICTURE_USD + 0.01}\n")
     midnight = datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1)
     clock = {"now": midnight - timedelta(seconds=2)}
 
@@ -263,10 +263,10 @@ async def test_the_day_is_read_after_the_wait_for_the_lock_not_before(project, p
 
     monkeypatch.setattr(spend, "datetime", Clock)
     quote = quote_one(project)  # made just before midnight
-    # another video spent $0.06 just after midnight, while this confirm waited for the lock
+    # another video spent $0.02 just after midnight, while this confirm waited for the lock
     spend._append_spend(
         project,
-        {"at": (midnight + timedelta(seconds=1)).isoformat(), "usd": 0.06, "quote": "q-other", "status": "confirmed"},
+        {"at": (midnight + timedelta(seconds=1)).isoformat(), "usd": 0.02, "quote": "q-other", "status": "confirmed"},
     )
     monkeypatch.setattr(spend, "_paying", waiting)
 
@@ -559,7 +559,9 @@ async def test_a_reservation_that_could_not_be_completed_leaves_no_hold_behind(p
 
 
 @pytest.mark.asyncio
-async def test_a_central_log_that_cannot_be_written_after_the_call_still_tells_the_host_budget(project, paid, monkeypatch):
+async def test_a_central_log_that_cannot_be_written_after_the_call_still_tells_the_host_budget(
+    project, paid, monkeypatch
+):
     quote = quote_one(project)
     told = []
 

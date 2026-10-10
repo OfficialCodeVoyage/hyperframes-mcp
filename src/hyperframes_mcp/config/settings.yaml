@@ -25,20 +25,20 @@ visuals:
     # only the selected variant (else the first) for each cue.
     variants_per_cue: 1
 
-    # Image backend (src/visual_generator/ai_image). To migrate off gpt-image-1, which
-    # shuts down 2026-10-23, change provider + model + presets together:
-    #   provider: openai  (key: OPENAI_API_KEY)   model e.g. gpt-image-2.5-flare
+    # Image backend. The picture tools (quote_picture, confirm_spend) draw with Nano Banana 2 through fal (one key,
+    # FAL_KEY, for pictures and clips). To use another backend, change provider + model + presets together:
     #   provider: fal     (key: FAL_KEY)          model = a fal endpoint id, e.g.
-    #                     fal-ai/flux-2-pro, openai/gpt-image-2.5/flare/text-to-image
+    #                     fal-ai/nano-banana-2, fal-ai/flux-2-pro, openai/gpt-image-2.5/flare/text-to-image
+    #   provider: openai  (key: OPENAI_API_KEY)   model e.g. gpt-image-2.5-flare (gpt-image-1 shuts down 2026-10-23)
     # Every preset must be priced in the table below, or startup fails with the missing entry.
-    provider: openai
-    model: gpt-image-1
+    provider: fal
+    model: fal-ai/nano-banana-2
     # A preset is a quality and a size. "draft" is also what an unknown preset name falls
     # back to. Flat-priced models (FLUX, Seedream) ignore quality; Seedream 5 Lite needs at
     # least 2560x1440 pixels, so give it its own sizes here.
     presets:
-      draft: {quality: low, size: 1024x1024}
-      production: {quality: medium, size: 1024x1024}
+      draft: {quality: low, size: 1376x768}
+      production: {quality: medium, size: 1376x768}
 
     # USD per image, used for the pre-flight budget check and the usage record. Figures were
     # read from the provider pages named in each note on 2026-09-30; "estimate" marks what no
@@ -66,6 +66,16 @@ visuals:
             max: {1024x768: 0.14445, 1024x1024: 0.21072, 1024x1536: 0.16464, 1920x1080: 0.1584, 2560x1440: 0.2211, 3840x2160: 0.40026}
         gpt-image-2.5-sunburst: *gpt_image_25
       fal:
+        fal-ai/nano-banana-2:
+          note: >-
+            estimate: fal.ai lists $0.08 an image at 1K and prices 2K at 1.5x ($0.12) and 4K at 2x ($0.16) on its
+            explore pages (2026-10-10); the model page (fal.ai/models/fal-ai/nano-banana-2) states no price, so check
+            it. Web search (+$0.015) and high thinking (+$0.002) are never switched on by this server. The tier is
+            the long edge of the size: up to 1536 px is 1K, up to 2816 px is 2K, up to 5632 px is 4K.
+          per_image:
+            low: {1376x768: 0.08, 768x1376: 0.08, 1024x1024: 0.08}
+            medium: {1376x768: 0.08, 768x1376: 0.08, 1024x1024: 0.08}
+            high: {2752x1536: 0.12, 1536x2752: 0.12, 2048x2048: 0.12}
         fal-ai/flux-2-pro:
           note: >-
             fal.ai/models/fal-ai/flux-2-pro: $0.03 for the first megapixel plus $0.015 per

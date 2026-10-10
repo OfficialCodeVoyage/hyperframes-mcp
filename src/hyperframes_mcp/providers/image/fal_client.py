@@ -29,6 +29,10 @@ Per-model input (``build_fal_input``), all with ``image_size`` as ``{"width", "h
 * ``fal-ai/bytedance/seedream/v5/lite/text-to-image``: no quality or output format; the custom
   size must total at least 2560x1440 pixels, so a 1024x1024 preset is rejected (HTTP 422).
   ``fal-ai/bytedance/seedream/v4.5/text-to-image`` needs 3.7 to 16.8 megapixels.
+* ``fal-ai/nano-banana-2`` (fal.ai/models/fal-ai/nano-banana-2/api, read 2026-10-10): no ``image_size``; it takes an
+  ``aspect_ratio`` (a fixed list, ``auto`` by default) and a ``resolution`` (0.5K, 1K, 2K, 4K, 1K by default) and
+  ``output_format`` jpeg|png|webp. The client sends the aspect ratio nearest the preset's size and the resolution its
+  long edge falls in (``nano_banana_resolution``); the price table lists the sizes of each tier.
 * Any other endpoint gets the generic ``prompt`` + ``image_size`` input. UNVERIFIED for such
   endpoints; check the model's API page before relying on it.
 
@@ -44,6 +48,7 @@ Prices are in ``pricing.py`` / settings.yaml. Cost per image is an estimate, not
 
 import asyncio
 import logging
+import math
 import time
 from contextlib import nullcontext
 from io import BytesIO
@@ -117,8 +122,36 @@ class FalTimeoutError(FalError):
     """The job did not finish within the client's timeout."""
 
 
+# The aspect ratios fal-ai/nano-banana-2 accepts besides ``auto``.
+_NANO_BANANA_RATIOS = (
+    (21, 9), (16, 9), (3, 2), (4, 3), (5, 4), (1, 1), (4, 5), (3, 4), (2, 3), (9, 16), (4, 1), (1, 4), (8, 1), (1, 8),
+)  # fmt: skip
+# The long edge up to which each resolution tier is drawn: a 16:9 picture is 1376 px (1K) or 2752 px (2K) wide.
+_NANO_BANANA_TIERS = ((1536, "1K"), (2816, "2K"), (5632, "4K"))
+
+
+def nano_banana_aspect_ratio(width: int, height: int) -> str:
+    """The accepted aspect ratio nearest ``width`` x ``height`` (by the ratio of their sides), as ``"16:9"``."""
+    wanted = math.log(width / height)
+    w, h = min(_NANO_BANANA_RATIOS, key=lambda ratio: abs(math.log(ratio[0] / ratio[1]) - wanted))
+    return f"{w}:{h}"
+
+
+def nano_banana_resolution(width: int, height: int) -> str:
+    """The resolution tier (``"1K"``, ``"2K"`` or ``"4K"``) a ``width`` x ``height`` picture is drawn at."""
+    edge = max(width, height)
+    return next((tier for limit, tier in _NANO_BANANA_TIERS if edge <= limit), _NANO_BANANA_TIERS[-1][1])
+
+
 def build_fal_input(model: str, prompt: str, width: int, height: int, quality: str) -> dict[str, Any]:
     """The JSON input for ``model``; see the module docstring for what is verified."""
+    if model == "fal-ai/nano-banana-2":
+        return {
+            "prompt": prompt,
+            "aspect_ratio": nano_banana_aspect_ratio(width, height),
+            "resolution": nano_banana_resolution(width, height),
+            "output_format": "png",
+        }
     body: dict[str, Any] = {
         "prompt": prompt,
         "image_size": {"width": width, "height": height},
@@ -203,18 +236,20 @@ class FalImageClient:
             if self._http_client is not None
             else httpx.AsyncClient(timeout=httpx.Timeout(60.0), follow_redirects=True)
         ) as http:
-            submit = (await self._request(http, "POST", f"{QUEUE_BASE}/{self.model}", json=body)).json()
-            await self._wait_until_complete(http, submit["status_url"])
-            result = (await self._request(http, "GET", submit["response_url"])).json()
-
-            images = result.get("images") or []
-            if not images or not images[0].get("url"):
-                raise FalAPIError(f"fal returned no image: {str(result)[:300]}")
             try:
-                # The CDN URL comes from the result: https only, byte cap, deadline, no key.
-                downloaded = await get_bytes(http, images[0]["url"])
-            except StockDownloadError as exc:
-                raise FalAPIError(f"fal image download refused: {exc}") from exc
+                submit = (await self._request(http, "POST", f"{QUEUE_BASE}/{self.model}", json=body)).json()
+            except FalNotSentError as exc:
+                exc.may_be_billed = False  # a 429 or a connection never made: fal cannot have taken the job
+                raise
+            if not isinstance(submit, dict) or not submit.get("status_url") or not submit.get("response_url"):
+                raise FalSubmitUncertainError(
+                    f"fal answered the submit with something that is not a job: {str(submit)[:200]}"
+                )
+            try:
+                downloaded = await self._finish_job(http, submit)
+            except Exception as exc:
+                exc.may_be_billed = True  # fal accepted the job: whatever fails from here on, it may be billed
+                raise
 
         # Decoding and re-encoding are CPU work; keep them off the event loop.
         image_bytes, (width, height) = await asyncio.to_thread(_as_png, downloaded)
@@ -227,6 +262,19 @@ class FalImageClient:
             model=self.model,
             provider=PROVIDER_NAME,
         )
+
+    async def _finish_job(self, http: httpx.AsyncClient, submit: dict) -> bytes:
+        """Wait for the accepted job, read its result and download the first image."""
+        await self._wait_until_complete(http, submit["status_url"])
+        result = (await self._request(http, "GET", submit["response_url"])).json()
+        images = result.get("images") or []
+        if not images or not images[0].get("url"):
+            raise FalAPIError(f"fal returned no image: {str(result)[:300]}")
+        try:
+            # The CDN URL comes from the result: https only, byte cap, deadline, no key.
+            return await get_bytes(http, images[0]["url"])
+        except StockDownloadError as exc:
+            raise FalAPIError(f"fal image download refused: {exc}") from exc
 
     async def _wait_until_complete(self, http: httpx.AsyncClient, status_url: str) -> None:
         deadline = time.monotonic() + self._timeout

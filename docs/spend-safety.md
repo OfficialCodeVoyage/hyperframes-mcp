@@ -1,6 +1,6 @@
 # Spend safety
 
-Claude calls a paid provider (OpenAI or fal.ai, with **your** keys) only through this server, and the HyperFrames app runs
+Claude calls a paid provider (fal.ai by default, OpenAI if you configure it, with **your** keys) only through this server, and the HyperFrames app runs
 its agent without asking permission first. So the limits are not a request to the agent: they are checks in the server's
 code that run before every paid call. This page says what they cover, what they do not, and how to tighten them.
 
@@ -97,8 +97,8 @@ hyperframes-mcp register --env HYPERFRAMES_MCP_PER_PROJECT_USD=5 --env HYPERFRAM
   (`HYPERFRAMES_MCP_HOME` moves it). If the server was registered with a different `HYPERFRAMES_MCP_HOME` than your shell
   has, `spend freeze` in your shell freezes a folder the server does not look at.
 - **Costs are the package's price table, not a bill.** A call is recorded at the cost the provider client reports from that
-  table. The table can be out of date (`gpt-image-1` is announced to be retired on 2026-10-23: check the model in
-  `config/settings.yaml`). The call limits above are what contain a wrong price.
+  table. The table can be out of date: the Nano Banana 2 figures come from fal's explore pages, because the model page states no
+  price (check it in `config/settings.yaml` against your fal bill). The call limits above are what contain a wrong price.
 - **The HyperFrames app's own paid features are not behind this server.** HeyGen's generation tools (video, speech,
   avatars) are given only to the app's own agent runs, on a route of their own, and they bill the HeyGen key saved in the
   app. They are not on the endpoint `register --with-app` adds (`doctor` lists the tools that endpoint offers and warns

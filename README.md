@@ -20,7 +20,7 @@ work on one timeline, and every change Claude makes is an entry in the app's own
   last looked, and `post_comment` pins a note at a time on your timeline.
 - **Finds free media** in the Library of Congress, Wikimedia Commons, the Internet Archive and Openverse, keeping a
   licence record and a true credit line for every file, plus an icon subset and vector tools.
-- **Makes pictures and clips with your own keys** (OpenAI, fal.ai). Every paid call is quoted first, confirmed second,
+- **Makes pictures and clips with your own key** (fal.ai: Nano Banana 2 for pictures, an image-to-video model for clips). Every paid call is quoted first, confirmed second,
   and checked against limits the server enforces. See [Spend safety](#spend-safety).
 
 The full list of the 30 tools is [`docs/tools.md`](docs/tools.md).
@@ -53,10 +53,12 @@ It puts the app's token in Claude Code's config; treat that config as a secret.
 
 ### Keys
 
-Only the paid pictures and clips need keys. The server reads `OPENAI_API_KEY` and `FAL_KEY` from the environment, then
+Only the paid pictures and clips need a key, and one is enough: `FAL_KEY` (fal.ai) draws the pictures with Nano Banana 2
+and makes the clips. `OPENAI_API_KEY` is needed only if you point `config/settings.yaml` at an OpenAI picture model.
+The server reads them from the environment, then
 `~/.hyperframes-mcp/config/.env`, then the macOS Keychain (service `hyperframes-mcp`). Claude never sees a key: tools
 say whether one is set, by name. To keep one in the Keychain:
-`security add-generic-password -s hyperframes-mcp -a OPENAI_API_KEY -w` (it asks for the value).
+`security add-generic-password -s hyperframes-mcp -a FAL_KEY -w` (it asks for the value).
 
 ## Use it
 
