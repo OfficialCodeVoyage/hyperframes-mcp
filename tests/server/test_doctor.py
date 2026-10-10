@@ -63,7 +63,8 @@ def test_the_app_check_is_green_for_a_tried_build_and_a_warning_for_a_new_one(tm
     assert absent.status == "warn"
 
 
-def test_the_registration_check_finds_the_command_the_entry_runs(tmp_path):
+def test_the_registration_check_finds_the_command_the_entry_runs(tmp_path, monkeypatch):
+    monkeypatch.setattr(doctor.shutil, "which", lambda name: f"/usr/local/bin/{name}")  # CI has no claude command
     python = tmp_path / "python"
     python.write_text("")
     shown = f"x:\n  Type: stdio\n  Command: {python}\n  Args: -m hyperframes_mcp serve\n"
