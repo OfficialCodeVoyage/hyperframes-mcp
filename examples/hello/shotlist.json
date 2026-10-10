@@ -1,0 +1,36 @@
+{
+  "version": 1,
+  "meta": {"title": "Hello, HyperFrames", "language": "en", "publish": false},
+  "audio": {
+    "voice": {"path": "audio/voice.wav"},
+    "master": {"lufs": -14.0, "true_peak_db": -1.0}
+  },
+  "shots": [
+    {
+      "id": "open",
+      "start": 0,
+      "duration": {"cue": "the vault", "offset": 0.6},
+      "layers": [
+        {"component": "act-title", "at": 0,
+         "variables": {"kicker": "Part 2", "title": "The vault", "subtitle": ""}},
+        {"component": "lower-third", "at": 0,
+         "variables": {"name": "Ada Example", "role": "Chief auditor", "side": "left"}}
+      ]
+    },
+    {
+      "id": "inventory",
+      "start": {"cue": "the vault", "offset": 0.2},
+      "duration": 6.7,
+      "transition_in": {"type": "dissolve", "seconds": 0.5},
+      "layers": [
+        {"component": "ledger", "at": 0,
+         "variables": {"title": "Harbour Bank reserve",
+                       "rows": "[{\"label\":\"Gold bars\",\"value\":\"8,198\",\"unit\":\"bars\"}]",
+                       "total": "{\"label\":\"Items counted\",\"value\":\"8,198\"}",
+                       "bigFigure": "", "rowTimes": ""}},
+        {"component": "credit-line", "at": 0.5, "duration": 4.4,
+         "variables": {"text": "Harbour Bank inventory, 1921. City Archive.", "align": "right"}}
+      ]
+    }
+  ]
+}

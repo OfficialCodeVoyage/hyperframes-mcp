@@ -1,0 +1,71 @@
+{
+  "files": [
+    {
+      "name": "Smittys010.jpg",
+      "source": "original",
+      "size": "906377",
+      "format": "JPEG"
+    },
+    {
+      "name": "Smittys010_archive.torrent",
+      "source": "metadata",
+      "size": "1992",
+      "format": "Archive BitTorrent"
+    },
+    {
+      "name": "Smittys010_files.xml",
+      "source": "original",
+      "format": "Metadata"
+    },
+    {
+      "name": "Smittys010_meta.sqlite",
+      "source": "original",
+      "size": "20480",
+      "format": "Metadata"
+    },
+    {
+      "name": "Smittys010_meta.xml",
+      "source": "original",
+      "size": "1310",
+      "format": "Metadata"
+    },
+    {
+      "name": "Smittys010_thumb.jpg",
+      "source": "derivative",
+      "format": "JPEG Thumb",
+      "original": "Smittys010.jpg",
+      "size": "9455"
+    },
+    {
+      "name": "__ia_thumb.jpg",
+      "source": "original",
+      "size": "15439",
+      "format": "Item Tile"
+    }
+  ],
+  "files_count": 7,
+  "item_size": 955053,
+  "metadata": {
+    "identifier": "Smittys010",
+    "collection": [
+      "newarksmittys",
+      "newarkpubliclibrary",
+      "americana"
+    ],
+    "date_other": "1960's",
+    "mediatype": "image",
+    "title": "Arthur J. Smith Jr and Rev. Cantrell",
+    "collection_added": [
+      "newarkpubliclibrary",
+      "americana"
+    ],
+    "publicdate": "2026-03-04 15:20:05",
+    "addeddate": "2026-03-04 15:20:05",
+    "subject": "Automobile service stations; African Americans; Newark",
+    "description": "Arthur J. Smith Jr. putting gas in Ford Falcon, part of a publicity campaign for Standard Oil.",
+    "rights": "Commercial use of images is subject to service fees. We require that all images be credited to The Newark Public Library. Images are available for download in small size / low resolution. For information about reproducing photos or obtaining high resolution tiff files see http://npl.org/copies/.",
+    "note": "This image was donated as a 600dpi tiff file, in digital format only.",
+    "local": "Smittys010.jpg",
+    "donor": "Smith, Brittney"
+  }
+}

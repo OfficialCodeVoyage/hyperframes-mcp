@@ -1,0 +1,243 @@
+{
+  "pagination": {
+    "current": 1,
+    "perpage": 5,
+    "total": 5
+  },
+  "results": [
+    {
+      "id": "http://www.loc.gov/item/2005679667/",
+      "url": "https://www.loc.gov/item/2005679667/",
+      "title": "Standard Oil Company operations at the Imperial oil refinery, Sarnia, Ontario, Aug., 1945",
+      "date": "1945",
+      "dates": [
+        "1945"
+      ],
+      "description": [
+        "11 photographic prints. | Photographs also show drilling and storage scenes at the Turner Valley oil fields, Black Diamond, Alberta, Sept. 1945."
+      ],
+      "image_url": [
+        "https://www.loc.gov/static/images/original-format/group-of-images.svg"
+      ],
+      "contributor": [
+        "parks, gordon"
+      ],
+      "access_restricted": true,
+      "unrestricted": true,
+      "digitized": true,
+      "mime_type": [
+        "image/jpg"
+      ],
+      "original_format": [
+        "photo, print, drawing",
+        "collection"
+      ],
+      "type": [
+        "still image"
+      ],
+      "item": {
+        "id": "2005679667",
+        "title": "Standard Oil Company operations at the Imperial oil refinery, Sarnia, Ontario, Aug., 1945",
+        "date": "1945.",
+        "created_published": "1945.",
+        "creators": [
+          {
+            "link": "https://www.loc.gov/pictures/related/?fi=name&q=Parks%2C%20Gordon%2C%201912-2006&co=coll",
+            "role": "photographer",
+            "title": "Parks, Gordon, 1912-2006"
+          }
+        ],
+        "contributors": [
+          "Parks, Gordon, 1912-2006, photographer."
+        ],
+        "rights_advisory": "Rights status of individual images not evaluated. For general information see: \"Copyright and Other Restrictions ...,\" https://www.loc.gov/rr/print/195_copr.html",
+        "rights_information": "Rights status of individual images not evaluated. For general information see: \"Copyright and Other Restrictions ...,\" https://www.loc.gov/rr/print/195_copr.html"
+      }
+    },
+    {
+      "id": "http://www.loc.gov/item/2025662344/",
+      "url": "https://www.loc.gov/item/2025662344/",
+      "title": "Standard Oil Refinery, near Los Angeles Harbor, Calif.",
+      "date": "1914",
+      "dates": [
+        "1914"
+      ],
+      "description": [
+        "1 print : photomechanical print ; sheet 9 x 14 cm (postcard format)"
+      ],
+      "image_url": [
+        "https://tile.loc.gov/storage-services/service/pnp/pcrd/1a00000/1a00000/1a00700/1a00713_150px.jpg#h=100&w=150",
+        "https://tile.loc.gov/storage-services/service/pnp/pcrd/1a00000/1a00000/1a00700/1a00713r.jpg#h=425&w=640",
+        "https://tile.loc.gov/storage-services/service/pnp/pcrd/1a00000/1a00000/1a00700/1a00713v.jpg#h=680&w=1024"
+      ],
+      "access_restricted": false,
+      "unrestricted": true,
+      "digitized": true,
+      "mime_type": [
+        "image/gif",
+        "image/jpg",
+        "image/tif"
+      ],
+      "original_format": [
+        "photo, print, drawing"
+      ],
+      "type": [
+        "still image"
+      ],
+      "item": {
+        "id": "2025662344",
+        "title": "Standard Oil Refinery, near Los Angeles Harbor, Calif.",
+        "date": "[between 1914 and 1934]",
+        "created_published": "[between 1914 and 1934]",
+        "rights_advisory": "No known restrictions on publication.",
+        "rights_information": "No known restrictions on publication."
+      }
+    },
+    {
+      "id": "http://www.loc.gov/item/2004679630/",
+      "url": "https://www.loc.gov/item/2004679630/",
+      "title": "A panic in the street",
+      "date": "1890-01-01",
+      "dates": [
+        "1890"
+      ],
+      "description": [
+        "1 print : line engraving. | Crowd in Wall Street; Morgan bank at left."
+      ],
+      "image_url": [
+        "https://tile.loc.gov/storage-services/service/pnp/cph/3b00000/3b03000/3b03700/3b03759_150px.jpg#h=150&w=97"
+      ],
+      "access_restricted": true,
+      "unrestricted": true,
+      "digitized": true,
+      "mime_type": [
+        "image/gif",
+        "image/jpg",
+        "image/tif"
+      ],
+      "original_format": [
+        "photo, print, drawing"
+      ],
+      "item": {
+        "id": "2004679630",
+        "title": "A panic in the street",
+        "date": "1890.",
+        "created_published": "1890.",
+        "rights_advisory": "Rights status not evaluated. For general information see \"Copyright and Other Restrictions...\" (http://lcweb.loc.gov/rr/print/195_copr.html).",
+        "rights_information": "Rights status not evaluated. For general information see \"Copyright and Other Restrictions...\" (http://lcweb.loc.gov/rr/print/195_copr.html)."
+      }
+    },
+    {
+      "id": "http://www.loc.gov/item/18015276/",
+      "url": "https://www.loc.gov/item/18015276/",
+      "title": "Market street, Philadelphia; the most historic highway in America, its merchants and its story,",
+      "date": "1918",
+      "dates": [
+        "1918"
+      ],
+      "description": [
+        "xv, 233 p. front., plates, ports., plans, facsims. 27 cm."
+      ],
+      "image_url": [
+        "https://tile.loc.gov/image-services/iiif/public:gdcmassbookdig:marketstreetphil00jack:marketstreetphil00jack_0013/full/pct:12.5/0/default.jpg",
+        "https://tile.loc.gov/image-services/iiif/public:gdcmassbookdig:marketstreetphil00jack:marketstreetphil00jack_0013/full/pct:12.5/0/default.jpg#h=341&w=232",
+        "https://tile.loc.gov/image-services/iiif/public:gdcmassbookdig:marketstreetphil00jack:marketstreetphil00jack_0013/full/pct:25.0/0/default.jpg#h=683&w=464",
+        "https://tile.loc.gov/image-services/iiif/public:gdcmassbookdig:marketstreetphil00jack:marketstreetphil00jack_0013/full/pct:50.0/0/default.jpg#h=1367&w=928",
+        "https://tile.loc.gov/image-services/iiif/public:gdcmassbookdig:marketstreetphil00jack:marketstreetphil00jack_0013/full/pct:100.0/0/default.jpg#h=2734&w=1856"
+      ],
+      "contributor": [
+        "woodrow wilson collection (library of congress)",
+        "jackson, joseph",
+        "woodrow wilson collection (library of congress) dlc"
+      ],
+      "access_restricted": false,
+      "digitized": true,
+      "mime_type": [
+        "text/xml",
+        "image/jpeg",
+        "image/jp2",
+        "text/plain",
+        "application/json",
+        "application/pdf"
+      ],
+      "original_format": [
+        "photo, print, drawing",
+        "book"
+      ],
+      "type": [
+        "still image"
+      ],
+      "item": {
+        "id": "18015276",
+        "title": "Market street, Philadelphia; the most historic highway in America, its merchants and its story,",
+        "date": "1918.",
+        "created_published": "Philadelphia, Joseph Jackson, 1918.",
+        "creators": [
+          {
+            "link": "https://www.loc.gov/pictures/related/?fi=name&q=Jackson%2C%20Joseph%2C%201867-1946.",
+            "role": "",
+            "title": "Jackson, Joseph, 1867-1946."
+          },
+          {
+            "link": "https://www.loc.gov/pictures/related/?fi=name&q=Woodrow%20Wilson%20Collection%20%28Library%20of%20Congress%29%20DLC",
+            "role": "",
+            "title": "Woodrow Wilson Collection (Library of Congress) DLC"
+          }
+        ],
+        "contributors": [
+          "Jackson, Joseph, 1867-1946.",
+          "Woodrow Wilson Collection (Library of Congress)"
+        ]
+      }
+    },
+    {
+      "id": "http://www.loc.gov/item/2010630382/",
+      "url": "https://www.loc.gov/item/2010630382/",
+      "title": "Federal Reserve Bank, Cleveland, Ohio",
+      "date": "2009-01-01",
+      "dates": [
+        "2009"
+      ],
+      "description": [
+        "1 photograph : digital, TIFF file, color."
+      ],
+      "image_url": [
+        "https://tile.loc.gov/image-services/iiif/service:pnp:highsm:04300:04395/full/pct:6.25/0/default.jpg#h=244&w=400",
+        "https://tile.loc.gov/image-services/iiif/service:pnp:highsm:04300:04395/full/pct:12.5/0/default.jpg#h=489&w=800",
+        "https://tile.loc.gov/image-services/iiif/service:pnp:highsm:04300:04395/full/pct:25/0/default.jpg#h=978&w=1601"
+      ],
+      "contributor": [
+        "highsmith, carol m."
+      ],
+      "access_restricted": false,
+      "unrestricted": true,
+      "digitized": true,
+      "mime_type": [
+        "image/gif",
+        "image/jpg",
+        "image/tif"
+      ],
+      "original_format": [
+        "photo, print, drawing"
+      ],
+      "item": {
+        "id": "2010630382",
+        "title": "Federal Reserve Bank, Cleveland, Ohio",
+        "date": "2009 April 12.",
+        "created_published": "2009 April 12.",
+        "creators": [
+          {
+            "link": "https://www.loc.gov/pictures/related/?fi=name&q=Highsmith%2C%20Carol%20M.%2C%201946-&co=highsm",
+            "role": "photographer",
+            "title": "Highsmith, Carol M., 1946-"
+          }
+        ],
+        "contributors": [
+          "Highsmith, Carol M., 1946- photographer."
+        ],
+        "rights_advisory": "No known restrictions on publication.",
+        "rights_information": "No known restrictions on publication."
+      }
+    }
+  ]
+}

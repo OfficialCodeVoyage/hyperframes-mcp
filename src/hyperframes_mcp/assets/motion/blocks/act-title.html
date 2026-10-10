@@ -1,0 +1,330 @@
+<!--
+  Copyright 2026 the hyperframes-mcp contributors.
+
+  Adapted from the HyperFrames registry component titlecard-calm, https://github.com/heygen-com/hyperframes,
+  registry/components/titlecard-calm/titlecard-calm.html at commit 568dc2ae5bbc0fc7f3acce5b3f6e745f7b1c670c,
+  Copyright 2026 HeyGen, Inc., licensed under the Apache License, Version 2.0 (the "License"); you may not use that
+  file except in compliance with the License. You may obtain a copy of the License at
+  http://www.apache.org/licenses/LICENSE-2.0. Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
+  either express or implied. See the License for the specific language governing permissions and limitations.
+
+  What is kept from the original: a small kicker over a large title, the kicker first and the title after it, the
+  whole lockup fading out at the end. What was changed: the text is variables, the look is night and paper (gold
+  kicker, paper title, a thin gold rule, an optional subtitle), the title is revealed word by word through a
+  clip-path mask instead of a plain fade, the lockup does not drift during the hold, every colour, size, font,
+  duration and ease is a token, the timeline fills durationSeconds exactly (the original compresses its phases
+  and uses a sine ease), and a slot too short for the entrance, the hold and the exit throws. The
+  container-query sizing of the original is replaced by the 1920 by 1080 canvas of the tokens.
+  See assets/motion/THIRD_PARTY.md.
+
+  A full-screen act title on the night ground: the ground fades in, a gold kicker, the title word by word, then a
+  thin gold rule and the subtitle, a hold of at least 2.5 seconds, and the whole block fades out.
+-->
+<!doctype html>
+<html
+  lang="en"
+  data-composition-variables='[
+    {"id":"durationSeconds","type":"number","label":"Seconds on screen, entrance and exit included","default":6.5,"min":4.5,"max":14,"step":0.1,"unit":"s"},
+    {"id":"kicker","type":"string","label":"Kicker, a small gold label above the title","default":"Part 2","maxLength":24},
+    {"id":"title","type":"string","label":"Title","default":"The Panic of 1873","maxLength":70},
+    {"id":"subtitle","type":"string","label":"Subtitle (may be empty)","default":"How a railroad boom broke the banks","maxLength":110}
+  ]'
+>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <title>Act title</title>
+    <link rel="stylesheet" href="tokens.css" />
+    <script src="vendor/gsap.min.js"></script>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        width: 1920px;
+        height: 1080px;
+        overflow: hidden;
+        background: transparent;
+      }
+      #at-root {
+        position: relative;
+        width: 1920px;
+        height: 1080px;
+        overflow: hidden;
+        font-variant-numeric: tabular-nums;
+      }
+      #at-root .at {
+        position: absolute;
+        inset: 0;
+      }
+      #at-root .at-ground {
+        position: absolute;
+        inset: 0;
+        background: var(--color-night);
+        opacity: 0;
+      }
+      #at-root .at-stack {
+        position: absolute;
+        inset: var(--safe-top) var(--safe-right) var(--safe-bottom) var(--safe-left);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+      }
+      #at-root .at-kicker {
+        font-family: var(--font-label);
+        font-weight: 600;
+        font-size: var(--size-label);
+        line-height: 1.2;
+        letter-spacing: 0.2em;
+        text-transform: uppercase;
+        color: var(--color-gold);
+        margin-bottom: 36px;
+      }
+      #at-root .at-title {
+        max-width: 1500px;
+        font-family: var(--font-display);
+        font-weight: 500;
+        font-size: var(--size-title);
+        line-height: 1.12;
+        color: var(--color-paper);
+        text-wrap: balance;
+      }
+      #at-root .at-word {
+        display: inline-block;
+        padding: 0 0.08em;
+        margin: 0 -0.08em;
+      }
+      #at-root .at-rule {
+        width: 160px;
+        height: 3px;
+        margin-top: 48px;
+        background: var(--color-gold);
+        transform-origin: 50% 50%;
+      }
+      #at-root .at-subtitle {
+        max-width: 1300px;
+        margin-top: 40px;
+        font-family: var(--font-display);
+        font-style: italic;
+        font-weight: 400;
+        font-size: var(--size-subtitle);
+        line-height: 1.25;
+        color: var(--color-paper-aged);
+        text-wrap: balance;
+      }
+      #at-root .at-subtitle:empty {
+        display: none;
+      }
+    </style>
+  </head>
+  <body>
+    <div
+      id="at-root"
+      data-composition-id="act-title"
+      data-width="1920"
+      data-height="1080"
+      data-start="0"
+      data-duration="6.5"
+    >
+      <div class="at">
+        <div class="at-ground"></div>
+        <div class="at-stack">
+          <p class="at-kicker"></p>
+          <h1 class="at-title"></h1>
+          <div class="at-rule"></div>
+          <p class="at-subtitle"></p>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      (function () {
+        "use strict";
+
+        // logic:begin
+        // The arithmetic of the slot, with no DOM in it. The page runs it for real, and the composer's preflight
+        // (src/hyperframes_mcp/motion/preflight.py) runs the same text in Node, so a shot list is refused before a render can fail.
+
+        // The longest text that sets inside the safe zone (the same numbers as maxLength above).
+        var MAX_KICKER = 24;
+        var MAX_TITLE = 70;
+        var MAX_SUBTITLE = 110;
+        // The shortest time the finished title stays up, whatever its length (the brief; there is no token for it).
+        var HOLD_MIN = 2.5;
+
+        // No literal fallbacks: a missing variable fails the render rather than drawing a wrong frame.
+        function line(V, id, max, mayBeEmpty) {
+          var value = V[id];
+          if (typeof value !== "string" || (!mayBeEmpty && value.trim().length === 0)) {
+            throw new Error("act-title: the " + id + " variable is missing or empty");
+          }
+          value = value.trim();
+          if (value.length > max) {
+            throw new Error("act-title: " + id + " is " + value.length + " characters, the card holds " + max);
+          }
+          return value;
+        }
+
+        // The title is one mask per word.
+        function titleWords(title) {
+          return title.split(/\s+/);
+        }
+
+        // When everything arrives and the shortest slot. Lines come in half the group stagger total apart (0.25 s).
+        // The words of the title come in a word stagger apart (0.1 s), squeezed so that a long title still starts all
+        // its words within the group total. Never off screen before it can be read: the hold is the longest of 2.5 s
+        // and the reading time of every word on the card, so a slot too short for entrance, hold and exit fails the
+        // render. tok(name) is the number of a token custom property.
+        function timing(V, tok) {
+          var kicker = line(V, "kicker", MAX_KICKER, false);
+          var title = line(V, "title", MAX_TITLE, false);
+          var subtitle = line(V, "subtitle", MAX_SUBTITLE, true);
+          var enter = tok("--dur-enter");
+          var exit = tok("--dur-exit");
+          var groupMax = tok("--dur-group-stagger-total-max");
+          var lineGap = groupMax / 2;
+          var count = titleWords(title).length;
+          var wordStep = count > 1 ? Math.min(tok("--dur-word-stagger"), groupMax / (count - 1)) : 0;
+          var kickerAt = lineGap;
+          var titleAt = 2 * lineGap;
+          var tailAt = titleAt + (count - 1) * wordStep + lineGap; // the rule and the subtitle
+          var entranceEnd = tailAt + enter;
+          var words = (kicker + " " + title + " " + subtitle).trim().split(/\s+/).length;
+          var hold = Math.max(HOLD_MIN, tok("--dur-read-min"), tok("--dur-read-per-word") * words);
+          return {
+            enter: enter,
+            exit: exit,
+            wordStep: wordStep,
+            kickerAt: kickerAt,
+            titleAt: titleAt,
+            tailAt: tailAt,
+            needed: entranceEnd + hold + exit,
+          };
+        }
+
+        function minSlot(V, tok) {
+          return timing(V, tok).needed;
+        }
+        // logic:end
+
+        // The idiom of the other blocks: the declared defaults first, then what HyperFrames resolved for this
+        // composition (declared defaults plus the mount's overrides). A mounted composition's <html> is not in
+        // the page, so there the second step carries the defaults.
+        function readVars() {
+          var out = {};
+          var raw = document.documentElement.getAttribute("data-composition-variables");
+          if (raw) {
+            JSON.parse(raw).forEach(function (d) {
+              out[d.id] = d.default;
+            });
+          }
+          var hf = window.__hyperframes;
+          var overrides =
+            hf && typeof hf.getVariables === "function" ? hf.getVariables() : window.__hfVariables;
+          if (overrides && typeof overrides === "object") {
+            for (var key in overrides) if (overrides[key] !== undefined) out[key] = overrides[key];
+          }
+          return out;
+        }
+
+        // Entrance travel in px: under the 24 px of the motion rules.
+        var RISE = 16;
+
+        var V = readVars();
+        var kicker = line(V, "kicker", MAX_KICKER, false);
+        var title = line(V, "title", MAX_TITLE, false);
+        var subtitle = line(V, "subtitle", MAX_SUBTITLE, true);
+
+        var rootEl = document.querySelector(".at");
+        var groundEl = document.querySelector(".at-ground");
+        var kickerEl = document.querySelector(".at-kicker");
+        var titleEl = document.querySelector(".at-title");
+        var ruleEl = document.querySelector(".at-rule");
+        var subtitleEl = document.querySelector(".at-subtitle");
+        kickerEl.textContent = kicker;
+        subtitleEl.textContent = subtitle;
+        // The title is one span per word so each word has its own mask; the space between them is a text node,
+        // so the browser still wraps and balances the lines.
+        var wordEls = titleWords(title).map(function (word, index) {
+          if (index > 0) titleEl.appendChild(document.createTextNode(" "));
+          var span = document.createElement("span");
+          span.className = "at-word";
+          span.textContent = word;
+          titleEl.appendChild(span);
+          return span;
+        });
+
+        function token(property) {
+          var value = getComputedStyle(rootEl).getPropertyValue(property).trim();
+          if (!value) throw new Error("tokens.css is not loaded: " + property + " is empty");
+          return value;
+        }
+        function seconds(property) {
+          return Number.parseFloat(token(property));
+        }
+        var when = timing(V, seconds);
+        var enter = when.enter;
+        var exit = when.exit;
+        var wordStep = when.wordStep;
+        var kickerAt = when.kickerAt;
+        var titleAt = when.titleAt;
+        var tailAt = when.tailAt;
+        var duration = Number.parseFloat(V.durationSeconds);
+        var needed = when.needed;
+        if (!Number.isFinite(duration) || duration + 1e-6 < needed) {
+          throw new Error(
+            "act-title: durationSeconds " + V.durationSeconds + " is shorter than the " +
+              needed.toFixed(2) + " s it needs (entrance, hold, exit)",
+          );
+        }
+
+        var enterEase = token("--ease-enter");
+        var tl = gsap.timeline({ paused: true });
+        // A masked reveal: the element's own clip-path opens from its bottom edge upward while it rises a few px.
+        function reveal(el, at) {
+          tl.fromTo(
+            el,
+            { clipPath: "inset(100% 0% 0% 0%)", y: RISE },
+            { clipPath: "inset(0% 0% 0% 0%)", y: 0, duration: enter, ease: enterEase },
+            at,
+          );
+        }
+        tl.fromTo(
+          groundEl,
+          { opacity: 0 },
+          { opacity: 1, duration: enter, ease: enterEase },
+          0,
+        );
+        reveal(kickerEl, kickerAt);
+        wordEls.forEach(function (el, index) {
+          reveal(el, titleAt + index * wordStep);
+        });
+        tl.fromTo(
+          ruleEl,
+          { scaleX: 0 },
+          { scaleX: 1, duration: enter, ease: enterEase },
+          tailAt,
+        );
+        if (subtitle.length > 0) {
+          reveal(subtitleEl, tailAt);
+        }
+        // The exit fades the whole block, faster than the entrance, ending with the slot.
+        tl.fromTo(
+          rootEl,
+          { opacity: 1 },
+          { opacity: 0, duration: exit, ease: token("--ease-exit"), immediateRender: false },
+          duration - exit,
+        );
+
+        window.__timelines = window.__timelines || {};
+        window.__timelines["act-title"] = tl;
+      })();
+    </script>
+  </body>
+</html>

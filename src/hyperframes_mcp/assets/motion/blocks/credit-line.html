@@ -1,0 +1,170 @@
+<!--
+  Copyright 2026 the hyperframes-mcp contributors. Hand-written for the motion library (src/hyperframes_mcp/motion): the reference
+  component of the contract in docs/motion-library.md. It shares no code with the HyperFrames catalog.
+
+  An archival source credit in a lower corner, inside the safe zone: label type at credit size on a scrim,
+  a fade in with the enter ease, a hold, a fade out with the exit ease. Contrast: paper on the scrim is 14.8:1 on
+  the opaque colour and stays above 4.5:1 with the scrim at 72% over pure white (tests/motion/test_credit_line.py).
+  Every colour, size, duration and ease comes from tokens.css (assets/motion/tokens.json); nothing here is a literal.
+-->
+<!doctype html>
+<html
+  lang="en"
+  data-composition-variables='[
+    {"id":"durationSeconds","type":"number","label":"Seconds on screen, fade in and fade out included","default":6.2,"min":2.4,"max":14,"step":0.1,"unit":"s"},
+    {"id":"text","type":"string","label":"Credit text","default":"Library of Congress, Prints and Photographs Division. Public domain.","maxLength":140},
+    {"id":"align","type":"enum","label":"Side of the frame","default":"left","options":[{"value":"left","label":"Left"},{"value":"right","label":"Right"}]}
+  ]'
+>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <title>Credit line</title>
+    <link rel="stylesheet" href="tokens.css" />
+    <script src="vendor/gsap.min.js"></script>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        width: 1920px;
+        height: 1080px;
+        overflow: hidden;
+        background: transparent;
+      }
+      #credit-root {
+        position: relative;
+        width: 1920px;
+        height: 1080px;
+        overflow: hidden;
+      }
+      #credit-root .credit {
+        position: absolute;
+        left: var(--safe-left);
+        bottom: var(--safe-bottom);
+        max-width: calc(100% - var(--safe-left) - var(--safe-right));
+        padding: 8px 20px;
+        font-family: var(--font-label);
+        font-weight: 500;
+        font-size: var(--size-credit);
+        line-height: 1.25;
+        letter-spacing: 0.02em;
+        color: var(--color-paper);
+        background: color-mix(in srgb, var(--color-scrim) 72%, transparent);
+        opacity: 0;
+      }
+      #credit-root .credit[data-align="right"] {
+        left: auto;
+        right: var(--safe-right);
+        text-align: right;
+      }
+    </style>
+  </head>
+  <body>
+    <div
+      id="credit-root"
+      data-composition-id="credit-line"
+      data-width="1920"
+      data-height="1080"
+      data-start="0"
+      data-duration="6.2"
+    >
+      <p class="credit" data-align="left"></p>
+    </div>
+
+    <script>
+      (function () {
+        "use strict";
+
+        // logic:begin
+        // The arithmetic of the slot, with no DOM in it. The page runs it for real, and the composer's preflight
+        // (src/hyperframes_mcp/motion/preflight.py) runs the same text in Node, so a shot list is refused before a render can fail.
+
+        function creditText(V) {
+          // No literal fallbacks: a missing variable fails the render rather than drawing a wrong frame.
+          if (typeof V.text !== "string" || V.text.trim().length === 0) {
+            throw new Error("credit-line: the text variable is missing or empty");
+          }
+          return V.text.trim();
+        }
+
+        // The shortest slot: the fade in, the reading time of the credit, the fade out. Never off screen before it
+        // can be read, so a slot shorter than this fails the render instead of cutting the credit short.
+        // tok(name) is the number of a token custom property.
+        function minSlot(V, tok) {
+          var words = creditText(V).split(" ").length;
+          var readSeconds = tok("--dur-read-min") + tok("--dur-read-per-word") * words;
+          return tok("--dur-enter") + readSeconds + tok("--dur-exit");
+        }
+        // logic:end
+
+        // The idiom of the other blocks: the declared defaults first, then what HyperFrames resolved for this
+        // composition (declared defaults plus the mount's overrides). A mounted composition's <html> is not in
+        // the page, so there the second step carries the defaults.
+        function readVars() {
+          var out = {};
+          var raw = document.documentElement.getAttribute("data-composition-variables");
+          if (raw) {
+            JSON.parse(raw).forEach(function (d) {
+              out[d.id] = d.default;
+            });
+          }
+          var hf = window.__hyperframes;
+          var overrides =
+            hf && typeof hf.getVariables === "function" ? hf.getVariables() : window.__hfVariables;
+          if (overrides && typeof overrides === "object") {
+            for (var key in overrides) if (overrides[key] !== undefined) out[key] = overrides[key];
+          }
+          return out;
+        }
+
+        var V = readVars();
+        var text = creditText(V);
+        var creditEl = document.querySelector(".credit");
+        creditEl.setAttribute("data-align", V.align === "right" ? "right" : "left");
+        creditEl.textContent = text;
+
+        function token(name) {
+          var value = getComputedStyle(creditEl).getPropertyValue(name).trim();
+          if (!value) throw new Error("tokens.css is not loaded: " + name + " is empty");
+          return value;
+        }
+        function seconds(name) {
+          return Number.parseFloat(token(name));
+        }
+        var enter = seconds("--dur-enter");
+        var exit = seconds("--dur-exit");
+        // The slot is durationSeconds (every component takes it): the fade in starts at 0 and the fade out
+        // ends at the slot's end; a slot shorter than minSlot fails the render.
+        var duration = Number.parseFloat(V.durationSeconds);
+        var needed = minSlot(V, seconds);
+        if (!Number.isFinite(duration) || duration + 1e-6 < needed) {
+          throw new Error(
+            "credit-line: durationSeconds " + V.durationSeconds + " is shorter than the " +
+              needed.toFixed(2) + " s it needs (fade in, reading time, fade out)",
+          );
+        }
+
+        var tl = gsap.timeline({ paused: true });
+        tl.fromTo(
+          creditEl,
+          { opacity: 0 },
+          { opacity: 1, duration: enter, ease: token("--ease-enter") },
+          0,
+        );
+        tl.fromTo(
+          creditEl,
+          { opacity: 1 },
+          { opacity: 0, duration: exit, ease: token("--ease-exit"), immediateRender: false },
+          duration - exit,
+        );
+
+        window.__timelines = window.__timelines || {};
+        window.__timelines["credit-line"] = tl;
+      })();
+    </script>
+  </body>
+</html>

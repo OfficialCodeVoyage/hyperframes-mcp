@@ -1,0 +1,451 @@
+{
+  "batchcomplete": true,
+  "query": {
+    "pages": [
+      {
+        "pageid": 163834389,
+        "ns": 6,
+        "title": "File:Standard Oil Refinery Richmond CA 1913.jpg",
+        "index": 1,
+        "imagerepository": "local",
+        "imageinfo": [
+          {
+            "size": 2525167,
+            "width": 2905,
+            "height": 700,
+            "url": "https://upload.wikimedia.org/wikipedia/commons/7/7c/Standard_Oil_Refinery_Richmond_CA_1913.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+            "descriptionurl": "https://commons.wikimedia.org/wiki/File:Standard_Oil_Refinery_Richmond_CA_1913.jpg",
+            "mime": "image/jpeg",
+            "extmetadata": {
+              "DateTime": {
+                "value": "2025-04-19 20:23:08",
+                "source": "mediawiki-metadata",
+                "hidden": ""
+              },
+              "ObjectName": {
+                "value": "Standard Oil Refinery Richmond CA 1913",
+                "source": "mediawiki-metadata"
+              },
+              "ImageDescription": {
+                "value": "General view, Standard Oil Company, Richmond, Calif.",
+                "source": "commons-desc-page"
+              },
+              "DateTimeOriginal": {
+                "value": "c. 1913",
+                "source": "commons-desc-page"
+              },
+              "Credit": {
+                "value": "This image  is available from the United States <a href=\"//commons.wikimedia.org/wiki/Library_of_Congress\" title=\"Library of Congress\">Library of Congress</a>'s <a rel=\"nofollow\" class=\"external text\" href=\"//www.loc.gov/rr/print/\">Prints and Photographs division</a><br> under the digital ID <a rel=\"nofollow\" class=\"external text\" href=\"https://hdl.loc.gov/loc.pnp/pan.6a17412\">pan.6a17412</a>.<br><small>This tag does not indicate the copyright status of the attached work. <span style=\"white-space:nowrap\">A normal <a href=\"//commons.wikimedia.org/wiki/Special:MyLanguage/Commons:Copyright_tags\" title=\"Special:MyLanguage/Commons:Copyright tags\">copyright tag</a> is still required.</span> <span style=\"white-space:nowrap\">See <a href=\"//commons.wikimedia.org/wiki/Special:MyLanguage/Commons:Licensing\" title=\"Special:MyLanguage/Commons:Licensing\">Commons:Licensing</a>.</span></small>",
+                "source": "commons-desc-page"
+              },
+              "Artist": {
+                "value": "West Coast Art Co.",
+                "source": "commons-desc-page"
+              },
+              "LicenseShortName": {
+                "value": "Public domain",
+                "source": "commons-desc-page",
+                "hidden": ""
+              },
+              "UsageTerms": {
+                "value": "Public domain",
+                "source": "commons-desc-page"
+              },
+              "AttributionRequired": {
+                "value": "false",
+                "source": "commons-desc-page",
+                "hidden": ""
+              },
+              "Copyrighted": {
+                "value": "False",
+                "source": "commons-desc-page",
+                "hidden": ""
+              },
+              "Restrictions": {
+                "value": "",
+                "source": "commons-desc-page",
+                "hidden": ""
+              },
+              "License": {
+                "value": "pd",
+                "source": "commons-templates",
+                "hidden": ""
+              }
+            }
+          }
+        ]
+      },
+      {
+        "pageid": 3413544,
+        "ns": 6,
+        "title": "File:Anacortes Refinery 31911.JPG",
+        "index": 2,
+        "imagerepository": "local",
+        "imageinfo": [
+          {
+            "size": 1072092,
+            "width": 2527,
+            "height": 1875,
+            "url": "https://upload.wikimedia.org/wikipedia/commons/5/51/Anacortes_Refinery_31911.JPG?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+            "descriptionurl": "https://commons.wikimedia.org/wiki/File:Anacortes_Refinery_31911.JPG",
+            "mime": "image/jpeg",
+            "extmetadata": {
+              "DateTime": {
+                "value": "2010-11-08 21:07:46",
+                "source": "mediawiki-metadata",
+                "hidden": ""
+              },
+              "ObjectName": {
+                "value": "Anacortes Refinery 31911",
+                "source": "mediawiki-metadata"
+              },
+              "ImageDescription": {
+                "value": "<a href=\"//commons.wikimedia.org/wiki/Oil_refinery#Anacortes_Refinery_(Tesoro_Corporation)\" title=\"Oil refinery\">Oil refinery#Anacortes Refinery (Tesoro Corporation)</a>, on the north end of March Point; Mount Baker (10,781 feet, 3286 meters); 2006 refinery capacity, 115,000 barrels per day; 917 acres, 350 employees<a rel=\"nofollow\" class=\"external autonumber\" href=\"http://www.tsocorp.com/tsocorp/ProductsandServices/Refining/Anacorteswashingtonrefinery/AnacortesWashRefinery\">[1]</a>",
+                "source": "commons-desc-page"
+              },
+              "DateTimeOriginal": {
+                "value": "13 January 2008, 11:40:35 −08:00",
+                "source": "commons-desc-page"
+              },
+              "Credit": {
+                "value": "<span class=\"int-own-work\" lang=\"en\">Own work</span>",
+                "source": "commons-desc-page"
+              },
+              "Artist": {
+                "value": "<a href=\"//commons.wikimedia.org/wiki/User:Wsiegmund\" title=\"User:Wsiegmund\">Walter Siegmund</a> <a href=\"//commons.wikimedia.org/wiki/User_talk:Wsiegmund\" title=\"User talk:Wsiegmund\">(talk)</a>",
+                "source": "commons-desc-page"
+              },
+              "LicenseShortName": {
+                "value": "CC BY 2.5",
+                "source": "commons-desc-page",
+                "hidden": ""
+              },
+              "UsageTerms": {
+                "value": "Creative Commons Attribution 2.5",
+                "source": "commons-desc-page"
+              },
+              "AttributionRequired": {
+                "value": "true",
+                "source": "commons-desc-page",
+                "hidden": ""
+              },
+              "LicenseUrl": {
+                "value": "https://creativecommons.org/licenses/by/2.5",
+                "source": "commons-desc-page"
+              },
+              "Copyrighted": {
+                "value": "True",
+                "source": "commons-desc-page",
+                "hidden": ""
+              },
+              "Restrictions": {
+                "value": "",
+                "source": "commons-desc-page",
+                "hidden": ""
+              },
+              "License": {
+                "value": "cc-by-2.5",
+                "source": "commons-templates",
+                "hidden": ""
+              }
+            }
+          }
+        ]
+      },
+      {
+        "pageid": 75555727,
+        "ns": 6,
+        "title": "File:Oil refinery in Houston 2018b.jpg",
+        "index": 3,
+        "imagerepository": "local",
+        "imageinfo": [
+          {
+            "size": 2302148,
+            "width": 3264,
+            "height": 2448,
+            "url": "https://upload.wikimedia.org/wikipedia/commons/8/87/Oil_refinery_in_Houston_2018b.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+            "descriptionurl": "https://commons.wikimedia.org/wiki/File:Oil_refinery_in_Houston_2018b.jpg",
+            "mime": "image/jpeg",
+            "extmetadata": {
+              "DateTime": {
+                "value": "2019-01-03 21:26:59",
+                "source": "mediawiki-metadata",
+                "hidden": ""
+              },
+              "ObjectName": {
+                "value": "Oil refinery in Houston 2018b",
+                "source": "mediawiki-metadata"
+              },
+              "ImageDescription": {
+                "value": "Flint Hills Resources in Meadowbrook/Allendale, Houston, Texas in 2018",
+                "source": "commons-desc-page"
+              },
+              "DateTimeOriginal": {
+                "value": "2018-07-30 10:08:02",
+                "source": "commons-desc-page"
+              },
+              "Credit": {
+                "value": "<span class=\"int-own-work\" lang=\"en\">Own work</span>",
+                "source": "commons-desc-page"
+              },
+              "Artist": {
+                "value": "<a href=\"//commons.wikimedia.org/wiki/User:Antony-22\" title=\"User:Antony-22\">Antony-22</a>",
+                "source": "commons-desc-page"
+              },
+              "LicenseShortName": {
+                "value": "CC BY-SA 4.0",
+                "source": "commons-desc-page",
+                "hidden": ""
+              },
+              "UsageTerms": {
+                "value": "Creative Commons Attribution-Share Alike 4.0",
+                "source": "commons-desc-page"
+              },
+              "AttributionRequired": {
+                "value": "true",
+                "source": "commons-desc-page",
+                "hidden": ""
+              },
+              "LicenseUrl": {
+                "value": "https://creativecommons.org/licenses/by-sa/4.0",
+                "source": "commons-desc-page"
+              },
+              "Copyrighted": {
+                "value": "True",
+                "source": "commons-desc-page",
+                "hidden": ""
+              },
+              "Restrictions": {
+                "value": "",
+                "source": "commons-desc-page",
+                "hidden": ""
+              },
+              "License": {
+                "value": "cc-by-sa-4.0",
+                "source": "commons-templates",
+                "hidden": ""
+              }
+            }
+          }
+        ]
+      },
+      {
+        "pageid": 183372324,
+        "ns": 6,
+        "title": "File:Moscow Oil Refinery 02.jpg",
+        "index": 4,
+        "imagerepository": "local",
+        "imageinfo": [
+          {
+            "size": 11624285,
+            "width": 9248,
+            "height": 6936,
+            "url": "https://upload.wikimedia.org/wikipedia/commons/7/7b/Moscow_Oil_Refinery_02.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+            "descriptionurl": "https://commons.wikimedia.org/wiki/File:Moscow_Oil_Refinery_02.jpg",
+            "mime": "image/jpeg",
+            "extmetadata": {
+              "DateTime": {
+                "value": "2026-02-07 06:33:19",
+                "source": "mediawiki-metadata",
+                "hidden": ""
+              },
+              "ObjectName": {
+                "value": "Moscow Oil Refinery 02",
+                "source": "mediawiki-metadata"
+              },
+              "ImageDescription": {
+                "value": "Moscow Oil Refinery",
+                "source": "commons-desc-page"
+              },
+              "DateTimeOriginal": {
+                "value": "2024-10-04 22:08:01",
+                "source": "commons-desc-page"
+              },
+              "Credit": {
+                "value": "<span class=\"int-own-work\" lang=\"en\">Own work</span>",
+                "source": "commons-desc-page"
+              },
+              "Artist": {
+                "value": "<a href=\"//commons.wikimedia.org/wiki/User:MBH\" title=\"User:MBH\">MBH</a>",
+                "source": "commons-desc-page"
+              },
+              "LicenseShortName": {
+                "value": "CC BY 4.0",
+                "source": "commons-desc-page",
+                "hidden": ""
+              },
+              "UsageTerms": {
+                "value": "Creative Commons Attribution 4.0",
+                "source": "commons-desc-page"
+              },
+              "AttributionRequired": {
+                "value": "true",
+                "source": "commons-desc-page",
+                "hidden": ""
+              },
+              "LicenseUrl": {
+                "value": "https://creativecommons.org/licenses/by/4.0",
+                "source": "commons-desc-page"
+              },
+              "Copyrighted": {
+                "value": "True",
+                "source": "commons-desc-page",
+                "hidden": ""
+              },
+              "Restrictions": {
+                "value": "",
+                "source": "commons-desc-page",
+                "hidden": ""
+              },
+              "License": {
+                "value": "cc-by-4.0",
+                "source": "commons-templates",
+                "hidden": ""
+              }
+            }
+          }
+        ]
+      },
+      {
+        "pageid": 102629154,
+        "ns": 6,
+        "title": "File:X04 Yuan Paper Currency.jpg",
+        "index": 5,
+        "imagerepository": "local",
+        "imageinfo": [
+          {
+            "size": 3952753,
+            "width": 3456,
+            "height": 5184,
+            "url": "https://upload.wikimedia.org/wikipedia/commons/a/a2/X04_Yuan_Paper_Currency.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+            "descriptionurl": "https://commons.wikimedia.org/wiki/File:X04_Yuan_Paper_Currency.jpg",
+            "mime": "image/jpeg",
+            "extmetadata": {
+              "ObjectName": {
+                "value": "X04 Yuan Paper Currency",
+                "source": "mediawiki-metadata"
+              },
+              "ImageDescription": {
+                "value": "Chinese Coins and Currency Exhibit, Liaoning Museum, Shenyang. Complete indexed photo collection at www.WorldHistoryPics.com.",
+                "source": "commons-desc-page"
+              },
+              "DateTimeOriginal": {
+                "value": "2014-05-09 13:30:05",
+                "source": "commons-desc-page"
+              },
+              "Credit": {
+                "value": "<a rel=\"nofollow\" class=\"external free\" href=\"https://www.flickr.com/photos/101561334@N08/14156173735/\">https://www.flickr.com/photos/101561334@N08/14156173735/</a>",
+                "source": "commons-desc-page"
+              },
+              "Artist": {
+                "value": "Gary Lee Todd, Ph.D.",
+                "source": "commons-desc-page"
+              },
+              "LicenseShortName": {
+                "value": "CC0",
+                "source": "commons-desc-page",
+                "hidden": ""
+              },
+              "UsageTerms": {
+                "value": "Creative Commons Zero, Public Domain Dedication",
+                "source": "commons-desc-page"
+              },
+              "AttributionRequired": {
+                "value": "false",
+                "source": "commons-desc-page",
+                "hidden": ""
+              },
+              "LicenseUrl": {
+                "value": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+                "source": "commons-desc-page"
+              },
+              "Copyrighted": {
+                "value": "True",
+                "source": "commons-desc-page",
+                "hidden": ""
+              },
+              "Restrictions": {
+                "value": "",
+                "source": "commons-desc-page",
+                "hidden": ""
+              },
+              "License": {
+                "value": "cc0",
+                "source": "commons-templates",
+                "hidden": ""
+              }
+            }
+          }
+        ]
+      },
+      {
+        "pageid": 102412,
+        "ns": 6,
+        "title": "File:Apollo 11 Crew.jpg",
+        "index": 6,
+        "imagerepository": "local",
+        "imageinfo": [
+          {
+            "size": 1628582,
+            "width": 4200,
+            "height": 3300,
+            "url": "https://upload.wikimedia.org/wikipedia/commons/3/3d/Apollo_11_Crew.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+            "descriptionurl": "https://commons.wikimedia.org/wiki/File:Apollo_11_Crew.jpg",
+            "mime": "image/jpeg",
+            "extmetadata": {
+              "ObjectName": {
+                "value": "Apollo 11 Crew",
+                "source": "mediawiki-metadata"
+              },
+              "ImageDescription": {
+                "value": "The Apollo 11 lunar landing mission crew, pictured from left to right, Neil A. Armstrong, commander; Michael Collins, command module pilot; and Edwin E. Aldrin Jr., lunar module pilot.",
+                "source": "commons-desc-page"
+              },
+              "DateTimeOriginal": {
+                "value": "14 April 1969",
+                "source": "commons-desc-page"
+              },
+              "Credit": {
+                "value": "<ul><li><a rel=\"nofollow\" class=\"external text\" data-mw-original-href=\"http://spaceflight.nasa.gov/gallery/images/apollo/apollo11/html/s69-31739.html\" href=\"https://spaceflight.nasa.gov/gallery/images/apollo/apollo11/html/s69-31739.html\">NASA Human Space Flight Gallery</a> (<a rel=\"nofollow\" class=\"external text\" data-mw-original-href=\"http://spaceflight.nasa.gov/gallery/images/apollo/apollo11/hires/s69-31739.jpg\" href=\"https://spaceflight.nasa.gov/gallery/images/apollo/apollo11/hires/s69-31739.jpg\">image link</a>)</li></ul>",
+                "source": "commons-desc-page"
+              },
+              "Artist": {
+                "value": "NASA",
+                "source": "commons-desc-page"
+              },
+              "LicenseShortName": {
+                "value": "Public domain",
+                "source": "commons-desc-page",
+                "hidden": ""
+              },
+              "UsageTerms": {
+                "value": "Public domain",
+                "source": "commons-desc-page"
+              },
+              "AttributionRequired": {
+                "value": "false",
+                "source": "commons-desc-page",
+                "hidden": ""
+              },
+              "Copyrighted": {
+                "value": "False",
+                "source": "commons-desc-page",
+                "hidden": ""
+              },
+              "Restrictions": {
+                "value": "",
+                "source": "commons-desc-page",
+                "hidden": ""
+              },
+              "License": {
+                "value": "pd",
+                "source": "commons-templates",
+                "hidden": ""
+              }
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

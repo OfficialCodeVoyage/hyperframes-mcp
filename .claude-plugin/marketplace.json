@@ -1,0 +1,14 @@
+{
+  "name": "hyperframes-mcp",
+  "description": "Claude Code plugins for working with the HyperFrames desktop app (unofficial, not affiliated with HeyGen).",
+  "owner": {
+    "name": "OfficialCodeVoyage"
+  },
+  "plugins": [
+    {
+      "name": "hyperframes-edit",
+      "source": "./",
+      "description": "Edit a HyperFrames project with Claude Code while you edit the same project by hand in the HyperFrames desktop app (unofficial, not affiliated with HeyGen). Needs the hyperframes-mcp command installed."
+    }
+  ]
+}

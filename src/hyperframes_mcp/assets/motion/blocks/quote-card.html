@@ -1,0 +1,492 @@
+<!--
+  Copyright 2026 the hyperframes-mcp contributors.
+
+  Adapted from the pull-quote card of the HyperFrames student kit, https://github.com/nateherkai/hyperframes-student-kit,
+  style-library/01-vox-explainer/cards/tier2/t2-lb-pullquote.html at commit 0d30152a82b9ceb93cfdd9bdbf46f0d5ab3cde86.
+
+  MIT License
+
+  Copyright (c) 2026 Nate Herk
+
+  Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
+  documentation files (the "Software"), to deal in the Software without restriction, including without limitation
+  the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and
+  to permit persons to whom the Software is furnished to do so, subject to the following conditions: The above
+  copyright notice and this permission notice shall be included in all copies or substantial portions of the
+  Software. THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT
+  LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT
+  SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+  OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+  DEALINGS IN THE SOFTWARE.
+
+  What is kept from the original: the structure of a large opening quotation mark, the quote and an attribution
+  line under it. What was changed: the text is variables (no hard-coded quote), the quote sits on a paper card over
+  the night ground and not on a transparent overlay, the look is night and paper (ink italic quote, oxblood mark,
+  label-font attribution, a source line), every colour, size, font, duration and ease is a token, nothing
+  overshoots or steps, the quote lines are broken in the script from the advance widths of the font so that each
+  line can be revealed on its own and the quote can never overflow, the timeline fills durationSeconds exactly,
+  and a slot too short for the entrance, the reading time and the exit throws. See assets/motion/THIRD_PARTY.md.
+
+  A primary-source quote on a paper card over the night ground: the ground fades in, the card fades and rises a few
+  pixels, the opening mark and the quote lines reveal one after the other, then the attribution and the source,
+  a hold of at least the reading time of the quote, and the whole block fades out.
+-->
+<!doctype html>
+<html
+  lang="en"
+  data-composition-variables='[
+    {"id":"durationSeconds","type":"number","label":"Seconds on screen, entrance and exit included","default":10.5,"min":3.2,"max":20,"step":0.1,"unit":"s"},
+    {"id":"quote","type":"string","label":"The quote, word for word from the source","default":"The only thing we have to fear is fear itself — nameless, unreasoning, unjustified terror which paralyzes needed efforts to convert retreat into advance.","maxLength":220},
+    {"id":"attribution","type":"string","label":"Who said or wrote it","default":"Franklin D. Roosevelt","maxLength":60},
+    {"id":"source","type":"string","label":"Where it comes from: document, date, licence","default":"First inaugural address, 4 March 1933. Public domain.","maxLength":90}
+  ]'
+>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <title>Quote card</title>
+    <link rel="stylesheet" href="tokens.css" />
+    <script src="vendor/gsap.min.js"></script>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        width: 1920px;
+        height: 1080px;
+        overflow: hidden;
+        background: transparent;
+      }
+      #qc-root {
+        --qc-text-width: 1168px;
+        --qc-pad-x: 88px;
+        position: relative;
+        width: 1920px;
+        height: 1080px;
+        overflow: hidden;
+        font-variant-numeric: tabular-nums;
+      }
+      #qc-root .qc {
+        position: absolute;
+        inset: 0;
+      }
+      #qc-root .qc-ground {
+        position: absolute;
+        inset: 0;
+        background: var(--color-night);
+        opacity: 0;
+      }
+      #qc-root .qc-stage {
+        position: absolute;
+        inset: var(--safe-top) var(--safe-right) var(--safe-bottom) var(--safe-left);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      #qc-root .qc-card {
+        position: relative;
+        min-width: 960px;
+        max-width: calc(var(--qc-text-width) + 2 * var(--qc-pad-x));
+        padding: 148px var(--qc-pad-x) 76px;
+        background: var(--color-paper);
+        opacity: 0;
+      }
+      #qc-root .qc-mark {
+        position: absolute;
+        top: 52px;
+        left: calc(var(--qc-pad-x) - 6px);
+        font-family: var(--font-display);
+        font-weight: 600;
+        font-size: calc(var(--size-title) * 2);
+        line-height: 1;
+        color: var(--color-oxblood);
+        opacity: 0;
+      }
+      #qc-root .qc-quote {
+        font-family: var(--font-display);
+        font-style: italic;
+        font-weight: 400;
+        line-height: 1.25;
+        color: var(--color-ink);
+      }
+      #qc-root .qc-quote[data-size="subtitle"] {
+        font-size: var(--size-subtitle);
+      }
+      #qc-root .qc-quote[data-size="body"] {
+        font-size: var(--size-body);
+      }
+      #qc-root .qc-quote[data-size="min-text"] {
+        font-size: var(--size-min-text);
+      }
+      #qc-root .qc-line {
+        display: block;
+        white-space: nowrap;
+        padding: 0 0.1em;
+        margin: 0 -0.1em;
+      }
+      #qc-root .qc-by {
+        margin-top: 44px;
+        opacity: 0;
+      }
+      #qc-root .qc-by-rule {
+        width: 96px;
+        height: 3px;
+        margin-bottom: 24px;
+        background: var(--color-oxblood);
+      }
+      #qc-root .qc-attribution {
+        font-family: var(--font-label);
+        font-weight: 600;
+        font-size: var(--size-label);
+        line-height: 1.2;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--color-ink);
+      }
+      #qc-root .qc-source {
+        margin-top: 8px;
+        font-family: var(--font-label);
+        font-weight: 500;
+        font-size: var(--size-credit);
+        line-height: 1.3;
+        letter-spacing: 0.02em;
+        color: color-mix(in srgb, var(--color-ink) 72%, var(--color-paper));
+      }
+    </style>
+  </head>
+  <body>
+    <div
+      id="qc-root"
+      data-composition-id="quote-card"
+      data-width="1920"
+      data-height="1080"
+      data-start="0"
+      data-duration="10.5"
+    >
+      <div class="qc">
+        <div class="qc-ground"></div>
+        <div class="qc-stage">
+          <div class="qc-card">
+            <p class="qc-mark">&ldquo;</p>
+            <div class="qc-quote"></div>
+            <div class="qc-by">
+              <div class="qc-by-rule"></div>
+              <p class="qc-attribution"></p>
+              <p class="qc-source"></p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      (function () {
+        "use strict";
+
+        // The idiom of the other blocks: the declared defaults first, then what HyperFrames resolved for this
+        // composition (declared defaults plus the mount's overrides). A mounted composition's <html> is not in
+        // the page, so there the second step carries the defaults.
+        function readVars() {
+          var out = {};
+          var raw = document.documentElement.getAttribute("data-composition-variables");
+          if (raw) {
+            JSON.parse(raw).forEach(function (d) {
+              out[d.id] = d.default;
+            });
+          }
+          var hf = window.__hyperframes;
+          var overrides =
+            hf && typeof hf.getVariables === "function" ? hf.getVariables() : window.__hfVariables;
+          if (overrides && typeof overrides === "object") {
+            for (var key in overrides) if (overrides[key] !== undefined) out[key] = overrides[key];
+          }
+          return out;
+        }
+
+        // logic:begin
+        // The line breaks and the arithmetic of the slot, with no DOM in it. The page runs them for real, and the
+        // composer's preflight (src/hyperframes_mcp/motion/preflight.py) runs the same text in Node, so a shot list is refused before a
+        // render can fail: the number of lines of the quote decides how long the card takes to arrive.
+
+        // Advance widths of Newsreader Italic (weight 400, optical size 56) in thousandths of an em, for the
+        // characters 32 (space) to 126 (~), and for the typographic marks below. Read from the font file; a test
+        // checks them against it. Kerning is ignored: it only ever tightens a line.
+        var ADVANCE = [
+          233, 255, 340, 585, 585, 770, 689, 186, 267, 267, 401, 553, 226, 320, 225, 404, 585, 585, 585, 585,
+          585, 585, 585, 650, 585, 585, 262, 266, 553, 553, 553, 466, 898, 687, 627, 684, 743, 634, 574, 738,
+          782, 336, 391, 706, 582, 964, 740, 762, 602, 761, 658, 534, 664, 752, 671, 943, 676, 652, 617, 294,
+          374, 294, 553, 390, 500, 502, 474, 382, 500, 394, 288, 423, 509, 286, 258, 476, 258, 786, 552, 450,
+          528, 473, 408, 338, 310, 519, 470, 689, 483, 490, 405, 290, 238, 289, 553,
+        ];
+        var ADVANCE_EXTRA = {
+          "‘": 226, "’": 228, "“": 397, "”": 399, "–": 477, "—": 634,
+          "…": 642, "é": 394, "è": 394, "ê": 394, "ë": 394, "à": 502,
+          "á": 502, "â": 502, "ä": 502, "ç": 382, "í": 286, "ï": 286,
+          "ó": 450, "ö": 450, "ô": 450, "ú": 519, "ü": 519, "ñ": 552,
+          "É": 634, "°": 379, "£": 585, "€": 585, "§": 512, "½": 768,
+          "·": 242,
+        };
+        // Any other character is counted wider than every lowercase letter, so it breaks a line early and never overflows.
+        var ADVANCE_UNKNOWN = 800;
+        // Safety margin over the table: the browser picks the optical size from the font size (48 to 64 here).
+        var ADVANCE_MARGIN = 1.04;
+
+        var MAX_QUOTE = 220; // the longest quote the card holds (the same number as maxLength above)
+        var MAX_ATTRIBUTION = 60;
+        var MAX_SOURCE = 90;
+        // The quote block is at most this tall in px, so the card with its attribution and source fits the safe zone,
+        // and its line height is the line-height of .qc-quote.
+        var MAX_QUOTE_HEIGHT = 420;
+        var LEADING = 1.25;
+        // The quote is set at the first of these sizes at which it fits the height: the largest type that fits, never
+        // under the minimum text size (five lines at the first, six at the second, seven at the last).
+        var SIZES = ["subtitle", "body", "min-text"]; // the tokens --size-subtitle, --size-body, --size-min-text
+
+        function measure(text, px) {
+          var thousandths = 0;
+          for (var i = 0; i < text.length; i++) {
+            var code = text.charCodeAt(i);
+            thousandths +=
+              code >= 32 && code <= 126
+                ? ADVANCE[code - 32]
+                : ADVANCE_EXTRA[text.charAt(i)] || ADVANCE_UNKNOWN;
+          }
+          return (thousandths / 1000) * px * ADVANCE_MARGIN;
+        }
+        function greedy(words, px, limit) {
+          var lines = [];
+          var current = "";
+          words.forEach(function (word) {
+            var joined = current ? current + " " + word : word;
+            if (current && measure(joined, px) > limit) {
+              lines.push(current);
+              current = word;
+            } else {
+              current = joined;
+            }
+          });
+          lines.push(current);
+          return lines;
+        }
+        // The break points of exactly `count` lines, none wider than `column`, with the least squared slack: no line
+        // ends much shorter than the others.
+        function evenLines(words, px, column, count) {
+          var n = words.length;
+          var best = [];
+          var from = [];
+          for (var k = 0; k <= count; k++) {
+            best.push(new Array(n + 1).fill(Infinity));
+            from.push(new Array(n + 1).fill(0));
+          }
+          best[0][0] = 0;
+          for (k = 1; k <= count; k++) {
+            for (var end = 1; end <= n; end++) {
+              for (var start = end - 1; start >= 0; start--) {
+                var width = measure(words.slice(start, end).join(" "), px);
+                if (width > column) break;
+                var cost = best[k - 1][start] + (column - width) * (column - width);
+                if (cost < best[k][end]) {
+                  best[k][end] = cost;
+                  from[k][end] = start;
+                }
+              }
+            }
+          }
+          var lines = [];
+          var stop = n;
+          for (k = count; k >= 1; k--) {
+            lines.unshift(words.slice(from[k][stop], stop).join(" "));
+            stop = from[k][stop];
+          }
+          return lines;
+        }
+        // The fewest lines that fit, then the narrowest column that still gives that many, then the even breaks in it.
+        function setLines(words, px, limit) {
+          var widest = Math.max.apply(
+            null,
+            words.map(function (word) {
+              return measure(word, px);
+            }),
+          );
+          if (widest > limit) return null;
+          var count = greedy(words, px, limit).length;
+          var low = widest;
+          var high = limit;
+          for (var step = 0; step < 24; step++) {
+            var middle = (low + high) / 2;
+            if (greedy(words, px, middle).length <= count) high = middle;
+            else low = middle;
+          }
+          return evenLines(words, px, high, count);
+        }
+
+        // No literal fallbacks: a missing variable fails the render rather than drawing a wrong frame.
+        function line(V, id, max) {
+          var value = V[id];
+          if (typeof value !== "string" || value.trim().length === 0) {
+            throw new Error("quote-card: the " + id + " variable is missing or empty");
+          }
+          value = value.trim();
+          if (value.length > max) {
+            throw new Error("quote-card: " + id + " is " + value.length + " characters, the card holds " + max);
+          }
+          return value;
+        }
+
+        // The quote set at the first size at which it fits, as { size, lines }. tok(name) is the number of a token
+        // custom property (a block-local one such as --qc-text-width too).
+        function layoutQuote(quote, tok) {
+          var words = quote.split(/\s+/);
+          var textWidth = tok("--qc-text-width");
+          for (var i = 0; i < SIZES.length; i++) {
+            var px = tok("--size-" + SIZES[i]);
+            var lines = setLines(words, px, textWidth);
+            if (lines !== null && lines.length * LEADING * px <= MAX_QUOTE_HEIGHT) {
+              return { size: SIZES[i], lines: lines };
+            }
+          }
+          throw new Error("quote-card: the quote does not fit the card at the minimum text size");
+        }
+
+        // When everything arrives and the shortest slot. Lines come in half the group stagger total apart (0.25 s);
+        // the quote lines are squeezed so that a long quote still starts all its lines within the group total. Never
+        // off screen before it can be read: the hold is at least 1.2 s and 0.3 s a word of the quote, so a slot too
+        // short for entrance, reading time and exit fails the render.
+        function timing(V, tok) {
+          var quote = line(V, "quote", MAX_QUOTE);
+          line(V, "attribution", MAX_ATTRIBUTION);
+          line(V, "source", MAX_SOURCE);
+          var set = layoutQuote(quote, tok);
+          var enter = tok("--dur-enter");
+          var exit = tok("--dur-exit");
+          var groupMax = tok("--dur-group-stagger-total-max");
+          var lineGap = groupMax / 2;
+          var lineStep = set.lines.length > 1 ? Math.min(lineGap, groupMax / (set.lines.length - 1)) : 0;
+          var cardAt = lineGap;
+          var quoteAt = 2 * lineGap; // the opening mark and the first line
+          var byAt = quoteAt + (set.lines.length - 1) * lineStep + lineGap;
+          var entranceEnd = byAt + enter;
+          var hold = Math.max(tok("--dur-read-min"), tok("--dur-read-per-word") * quote.split(/\s+/).length);
+          return {
+            set: set,
+            enter: enter,
+            exit: exit,
+            lineStep: lineStep,
+            cardAt: cardAt,
+            quoteAt: quoteAt,
+            byAt: byAt,
+            needed: entranceEnd + hold + exit,
+          };
+        }
+
+        function minSlot(V, tok) {
+          return timing(V, tok).needed;
+        }
+        // logic:end
+
+        // Entrance travel in px: under the 24 px of the motion rules.
+        var CARD_RISE = 20;
+        var LINE_RISE = 14;
+
+        var V = readVars();
+        var quote = line(V, "quote", MAX_QUOTE);
+        var attribution = line(V, "attribution", MAX_ATTRIBUTION);
+        var source = line(V, "source", MAX_SOURCE);
+
+        var rootEl = document.querySelector(".qc");
+        var groundEl = document.querySelector(".qc-ground");
+        var cardEl = document.querySelector(".qc-card");
+        var markEl = document.querySelector(".qc-mark");
+        var quoteEl = document.querySelector(".qc-quote");
+        var byEl = document.querySelector(".qc-by");
+        document.querySelector(".qc-attribution").textContent = attribution;
+        document.querySelector(".qc-source").textContent = source;
+
+        function token(property) {
+          var value = getComputedStyle(rootEl).getPropertyValue(property).trim();
+          if (!value) throw new Error("tokens.css is not loaded: " + property + " is empty");
+          return value;
+        }
+        function seconds(property) {
+          return Number.parseFloat(token(property));
+        }
+
+        var when = timing(V, seconds);
+        var set = when.set;
+        quoteEl.setAttribute("data-size", set.size);
+        var lineEls = set.lines.map(function (text) {
+          var span = document.createElement("span");
+          span.className = "qc-line";
+          span.textContent = text;
+          quoteEl.appendChild(span);
+          return span;
+        });
+
+        var enter = when.enter;
+        var exit = when.exit;
+        var lineStep = when.lineStep;
+        var cardAt = when.cardAt;
+        var quoteAt = when.quoteAt;
+        var byAt = when.byAt;
+        var duration = Number.parseFloat(V.durationSeconds);
+        var needed = when.needed;
+        if (!Number.isFinite(duration) || duration + 1e-6 < needed) {
+          throw new Error(
+            "quote-card: durationSeconds " + V.durationSeconds + " is shorter than the " +
+              needed.toFixed(2) + " s it needs (entrance, reading time, exit)",
+          );
+        }
+
+        var enterEase = token("--ease-enter");
+        var tl = gsap.timeline({ paused: true });
+        tl.fromTo(
+          groundEl,
+          { opacity: 0 },
+          { opacity: 1, duration: enter, ease: enterEase },
+          0,
+        );
+        // The card fades and rises; it does not scale.
+        tl.fromTo(
+          cardEl,
+          { opacity: 0, y: CARD_RISE },
+          { opacity: 1, y: 0, duration: enter, ease: enterEase },
+          cardAt,
+        );
+        tl.fromTo(
+          markEl,
+          { opacity: 0 },
+          { opacity: 1, duration: enter, ease: enterEase },
+          quoteAt,
+        );
+        // Each line is revealed through its own clip-path, opening from the bottom edge while it rises a few px.
+        lineEls.forEach(function (el, index) {
+          tl.fromTo(
+            el,
+            { clipPath: "inset(100% 0% 0% 0%)", y: LINE_RISE },
+            { clipPath: "inset(0% 0% 0% 0%)", y: 0, duration: enter, ease: enterEase },
+            quoteAt + index * lineStep,
+          );
+        });
+        tl.fromTo(
+          byEl,
+          { opacity: 0, y: LINE_RISE },
+          { opacity: 1, y: 0, duration: enter, ease: enterEase },
+          byAt,
+        );
+        // The exit fades the whole block, faster than the entrance, ending with the slot.
+        tl.fromTo(
+          rootEl,
+          { opacity: 1 },
+          { opacity: 0, duration: exit, ease: token("--ease-exit"), immediateRender: false },
+          duration - exit,
+        );
+
+        window.__timelines = window.__timelines || {};
+        window.__timelines["quote-card"] = tl;
+      })();
+    </script>
+  </body>
+</html>

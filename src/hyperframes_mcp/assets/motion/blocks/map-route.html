@@ -1,0 +1,622 @@
+<!--
+  Copyright 2026 the hyperframes-mcp contributors. Hand-written for the motion library (src/hyperframes_mcp/motion); it shares no code with the
+  HyperFrames catalog. The idea of a route drawn over a map, and the camera and label rules, come from an earlier prototype. The land is assets/motion/data/map-<region>.js (Natural Earth, public domain,
+  built by python -m hyperframes_mcp.motion map-data; see data/DATA.md); the projections, the label measuring and the label placement
+  are js/map-lib.js.
+
+  A map shot: land and sea in night and paper, a camera move from one pose to another (a visible width in degrees and a
+  centre), then, with the camera held, pins that arrive one after another with a single pulse ring and a label, a route
+  drawn on, a date in a corner and a caption beneath it. Overlays never move while the camera does. Labels are placed from
+  the label font's advance widths (no DOM measuring, so the layout is the same on every machine): the labelSide hint
+  first, then the opposite side, then above or below; nothing may overlap a dot, another label or the corner text, or
+  leave the safe zone, and when no side is free the render fails instead of drawing a collision. Every colour, size,
+  duration and ease comes from tokens.css (assets/motion/tokens.json).
+-->
+<!doctype html>
+<html
+  lang="en"
+  data-composition-variables='[
+    {"id":"durationSeconds","type":"number","label":"Seconds on screen, fades and the map move included","default":8.6,"min":3,"max":30,"step":0.1,"unit":"s"},
+    {"id":"region","type":"enum","label":"Map data","default":"germany","options":[{"value":"germany","label":"Germany and its neighbours"},{"value":"europe","label":"Europe"},{"value":"world","label":"World"}]},
+    {"id":"pins","type":"string","label":"Pins as JSON: [{\"id\":\"berlin\",\"label\":\"Berlin\",\"lon\":13.405,\"lat\":52.52,\"labelSide\":\"right\",\"kind\":\"city\"}]; kind is city, focus, region (a spaced label, no dot) or via (a point of the route, nothing drawn); lon and lat may be left out for a name in the cities table of the region","default":"[{\"id\":\"berlin\",\"label\":\"Berlin\",\"lon\":13.405,\"lat\":52.52,\"labelSide\":\"right\"},{\"id\":\"leipzig\",\"label\":\"Leipzig\",\"lon\":12.37,\"lat\":51.34,\"labelSide\":\"right\"},{\"id\":\"via1\",\"kind\":\"via\",\"lon\":12.55,\"lat\":52.0},{\"id\":\"via2\",\"kind\":\"via\",\"lon\":11.7,\"lat\":51.45},{\"id\":\"via3\",\"kind\":\"via\",\"lon\":10.95,\"lat\":51.05},{\"id\":\"marburg\",\"label\":\"Marburg\",\"kind\":\"focus\",\"lon\":10.12,\"lat\":50.82,\"labelSide\":\"left\"}]"},
+    {"id":"route","type":"string","label":"Pin ids in the order the route runs, as JSON; [] for no route","default":"[\"berlin\",\"via1\",\"via2\",\"via3\",\"marburg\"]"},
+    {"id":"yearLabel","type":"string","label":"A date or year in the corner (may be empty)","default":"February 11","maxLength":40},
+    {"id":"caption","type":"string","label":"One line under it (may be empty)","default":"Berlin to Marburg by rail","maxLength":90},
+    {"id":"cameraFrom","type":"string","label":"Camera at the start as JSON {lon, lat, span}; span is the visible width in degrees of longitude","default":"{\"lon\":11.75,\"lat\":51.7,\"span\":9.6}"},
+    {"id":"cameraTo","type":"string","label":"Camera when held; equal to cameraFrom locks the camera","default":"{\"lon\":11.75,\"lat\":51.7,\"span\":8.1}"},
+    {"id":"routeStyle","type":"enum","label":"How the route is drawn","default":"rail","options":[{"value":"line","label":"Line"},{"value":"rail","label":"Rail"},{"value":"dots","label":"Dots"}]},
+    {"id":"borders","type":"enum","label":"Borders (the modern ones)","default":"none","options":[{"value":"none","label":"None"},{"value":"countries","label":"Countries"},{"value":"regions","label":"Countries and first-level regions"}]}
+  ]'
+>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <title>Map route</title>
+    <link rel="stylesheet" href="tokens.css" />
+    <script src="vendor/gsap.min.js"></script>
+    <script src="js/map-lib.js"></script>
+    <script src="data/map-germany.js"></script>
+    <script src="data/map-europe.js"></script>
+    <script src="data/map-world.js"></script>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        width: 1920px;
+        height: 1080px;
+        overflow: hidden;
+        background: transparent;
+      }
+      #map-root {
+        position: relative;
+        width: 1920px;
+        height: 1080px;
+        overflow: hidden;
+        --sea: color-mix(in srgb, var(--color-night) 78%, var(--color-scrim));
+        --land: color-mix(in srgb, var(--color-night) 84%, var(--color-paper));
+        --coast: color-mix(in srgb, var(--color-paper) 62%, var(--land));
+        --river: color-mix(in srgb, var(--color-paper) 52%, var(--color-slate));
+        --border: color-mix(in srgb, var(--color-paper) 40%, var(--land));
+        --region: color-mix(in srgb, var(--color-paper) 24%, var(--land));
+        --grid: color-mix(in srgb, var(--color-paper) 9%, var(--land));
+        --halo: var(--color-scrim);
+        --caption-width: 780px;
+        --corner-gap: 12px;
+      }
+      #map-root .stage {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 1920px;
+        height: 1080px;
+        overflow: hidden;
+        background: var(--sea);
+        opacity: 0;
+      }
+      #map-root svg {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 1920px;
+        height: 1080px;
+        overflow: hidden;
+      }
+      #map-root .land {
+        fill: var(--land);
+        fill-rule: evenodd;
+        stroke: var(--coast);
+        stroke-width: 2px;
+        stroke-linejoin: round;
+        vector-effect: non-scaling-stroke;
+      }
+      #map-root .grid,
+      #map-root .river,
+      #map-root .border,
+      #map-root .region {
+        fill: none;
+        vector-effect: non-scaling-stroke;
+      }
+      #map-root .grid {
+        stroke: var(--grid);
+        stroke-width: 1.5px;
+      }
+      #map-root .river {
+        stroke: var(--river);
+        stroke-width: 2px;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+      }
+      #map-root .border {
+        stroke: var(--border);
+        stroke-width: 2px;
+        stroke-linejoin: round;
+      }
+      #map-root .region {
+        stroke: var(--region);
+        stroke-width: 1.5px;
+        stroke-linejoin: round;
+      }
+      #map-root .route-core,
+      #map-root .route-ties {
+        fill: none;
+        stroke: var(--color-gold);
+        stroke-linejoin: round;
+      }
+      #map-root .route-core {
+        stroke-width: 8px;
+        stroke-linecap: round;
+      }
+      #map-root .route-ties {
+        display: none;
+      }
+      #map-root .route[data-style="rail"] .route-core {
+        stroke-width: 6px;
+        stroke-linecap: butt;
+      }
+      #map-root .route[data-style="rail"] .route-ties {
+        display: inline;
+        stroke-width: 22px;
+        stroke-dasharray: 3 14;
+      }
+      #map-root .route[data-style="dots"] .route-core {
+        display: none;
+      }
+      #map-root .route[data-style="dots"] .route-ties {
+        display: inline;
+        stroke-width: 14px;
+        stroke-linecap: round;
+        stroke-dasharray: 0.01 26;
+      }
+      #map-root .route-reveal {
+        fill: none;
+        stroke: var(--color-paper);
+        stroke-width: 50px;
+        stroke-linecap: butt;
+        stroke-linejoin: round;
+      }
+      #map-root .pins {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 1920px;
+        height: 1080px;
+      }
+      #map-root .pin-dot,
+      #map-root .pin-ring {
+        position: absolute;
+        border-radius: 50%;
+        opacity: 0;
+      }
+      #map-root .pin-dot {
+        background: var(--color-paper);
+        border: 4px solid var(--halo);
+      }
+      #map-root .pin-ring {
+        border: 3px solid var(--color-paper);
+      }
+      #map-root .pin-dot[data-kind="focus"] {
+        background: var(--color-gold);
+      }
+      #map-root .pin-ring[data-kind="focus"] {
+        border-color: var(--color-gold);
+      }
+      #map-root .pin-label {
+        position: absolute;
+        white-space: nowrap;
+        font-family: var(--font-label);
+        font-weight: 600;
+        font-size: var(--size-label);
+        line-height: 1.15;
+        color: var(--color-paper);
+        -webkit-text-stroke: 6px var(--halo);
+        paint-order: stroke fill;
+        stroke-linejoin: round;
+        opacity: 0;
+      }
+      #map-root .pin-label[data-kind="focus"] {
+        font-size: var(--size-subtitle);
+        font-weight: 700;
+      }
+      #map-root .pin-label[data-kind="region"] {
+        font-weight: 500;
+        letter-spacing: 0.32em;
+        text-transform: uppercase;
+        color: color-mix(in srgb, var(--color-paper) 84%, var(--land));
+      }
+      #map-root .corner {
+        position: absolute;
+        top: var(--safe-top);
+        left: var(--safe-left);
+        max-width: var(--caption-width);
+        text-align: left;
+      }
+      #map-root .corner[data-corner="right"] {
+        left: auto;
+        right: var(--safe-right);
+        text-align: right;
+      }
+      #map-root .year {
+        font-family: var(--font-display);
+        font-weight: 500;
+        font-size: var(--size-title);
+        line-height: 1.1;
+        font-variant-numeric: tabular-nums;
+        color: var(--color-gold);
+        -webkit-text-stroke: 7px var(--halo);
+        paint-order: stroke fill;
+        stroke-linejoin: round;
+        opacity: 0;
+      }
+      #map-root .caption {
+        margin-top: var(--corner-gap);
+        font-family: var(--font-label);
+        font-weight: 500;
+        font-size: var(--size-label);
+        line-height: 1.25;
+        color: var(--color-paper);
+        -webkit-text-stroke: 6px var(--halo);
+        paint-order: stroke fill;
+        stroke-linejoin: round;
+        opacity: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <div
+      id="map-root"
+      data-composition-id="map-route"
+      data-width="1920"
+      data-height="1080"
+      data-start="0"
+      data-duration="8.6"
+    >
+      <div class="stage">
+        <svg class="map" viewBox="0 0 1920 1080" data-layout-allow-overflow>
+          <g class="camera" data-linear-ok data-layout-allow-overflow>
+            <path class="land" />
+            <path class="grid" />
+            <path class="river" />
+            <path class="region" />
+            <path class="border" />
+          </g>
+        </svg>
+        <svg class="route" viewBox="0 0 1920 1080" data-style="rail">
+          <defs>
+            <mask
+              id="map-route-reveal-mask"
+              maskUnits="userSpaceOnUse"
+              x="0"
+              y="0"
+              width="1920"
+              height="1080"
+              style="mask-type: alpha"
+            >
+              <path class="route-reveal" />
+            </mask>
+          </defs>
+          <g mask="url(#map-route-reveal-mask)">
+            <path class="route-core" />
+            <path class="route-ties" />
+          </g>
+        </svg>
+        <div class="pins"></div>
+        <div class="corner">
+          <p class="year"></p>
+          <p class="caption"></p>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      (function () {
+        "use strict";
+
+        // The idiom of the other blocks: the declared defaults first, then what HyperFrames resolved for this
+        // composition (declared defaults plus the mount's overrides).
+        function readVars() {
+          var out = {};
+          var raw = document.documentElement.getAttribute("data-composition-variables");
+          if (raw) {
+            JSON.parse(raw).forEach(function (d) {
+              out[d.id] = d.default;
+            });
+          }
+          var hf = window.__hyperframes;
+          var overrides =
+            hf && typeof hf.getVariables === "function" ? hf.getVariables() : window.__hfVariables;
+          if (overrides && typeof overrides === "object") {
+            for (var key in overrides) if (overrides[key] !== undefined) out[key] = overrides[key];
+          }
+          return out;
+        }
+
+        var lib = window.__MOTION_MAP_LIB;
+        if (!lib) throw new Error("map-route: js/map-lib.js is not loaded");
+
+        var V = readVars();
+        // No literal fallbacks: a missing variable fails the render rather than drawing a wrong frame.
+        var NAMES = [
+          "durationSeconds", "region", "pins", "route", "yearLabel", "caption",
+          "cameraFrom", "cameraTo", "routeStyle", "borders",
+        ];
+        NAMES.forEach(function (name) {
+          if (V[name] === undefined || V[name] === null) throw new Error("map-route: the " + name + " variable is missing");
+        });
+        if (["line", "rail", "dots"].indexOf(V.routeStyle) < 0) throw new Error("map-route: routeStyle must be line, rail or dots");
+        if (["none", "countries", "regions"].indexOf(V.borders) < 0) throw new Error("map-route: borders must be none, countries or regions");
+        if (typeof V.yearLabel !== "string" || typeof V.caption !== "string") {
+          throw new Error("map-route: yearLabel and caption are texts (empty for none)");
+        }
+
+        var rootEl = document.querySelector("#map-root");
+        var stageEl = rootEl.querySelector(".stage");
+        var W = Number(rootEl.getAttribute("data-width"));
+        var H = Number(rootEl.getAttribute("data-height"));
+
+        function token(name) {
+          var value = getComputedStyle(rootEl).getPropertyValue(name).trim();
+          if (!value) throw new Error("tokens.css is not loaded: " + name + " is empty");
+          return value;
+        }
+        function number(name) {
+          return Number.parseFloat(token(name));
+        }
+        var t = {
+          enter: number("--dur-enter"),
+          exit: number("--dur-exit"),
+          micro: number("--dur-micro"),
+          staggerTotal: number("--dur-group-stagger-total-max"),
+          cinematicMin: number("--dur-cinematic-min"),
+          cinematicMax: number("--dur-cinematic-max"),
+          readMin: number("--dur-read-min"),
+          readPerWord: number("--dur-read-per-word"),
+        };
+        var easeEnter = token("--ease-enter");
+        var easeExit = token("--ease-exit");
+        var easeMove = token("--ease-move");
+        var safe = {
+          x0: number("--safe-left"),
+          y0: number("--safe-top"),
+          x1: W - number("--safe-right"),
+          y1: H - number("--safe-bottom"),
+        };
+        var labelSize = number("--size-label");
+        var focusSize = number("--size-subtitle");
+
+        // ---- the map data and the camera -------------------------------------------------------------------
+        var data = (window.__MOTION_MAPS || {})[V.region];
+        if (!data) throw new Error("map-route: no map data for region " + V.region + " (data/map-" + V.region + ".js is not loaded)");
+        var project = lib.makeProjection(data.projection);
+        var camFrom = lib.readCamera("cameraFrom", V.cameraFrom);
+        var camTo = lib.readCamera("cameraTo", V.cameraTo);
+        var locked = camFrom.lon === camTo.lon && camFrom.lat === camTo.lat && camFrom.span === camTo.span;
+        var poseFrom = lib.cameraPose(project, camFrom, W);
+        var poseTo = lib.cameraPose(project, camTo, W);
+
+        // The data stops at the window of its region: the camera must stay inside it, or the edge of the land shows.
+        function assertInside(name, pose) {
+          if (!data.outline) return;
+          [-1, 0, 1].forEach(function (i) {
+            [-1, 0, 1].forEach(function (j) {
+              var x = pose.cx + (i * W) / 2 / pose.s;
+              var y = pose.cy + (j * H) / 2 / pose.s;
+              if (!lib.insidePolygon(x, y, data.outline)) {
+                throw new Error("map-route: " + name + " shows ground beyond the " + V.region + " map data; use a smaller span or another region");
+              }
+            });
+          });
+        }
+        assertInside("cameraFrom", poseFrom);
+        assertInside("cameraTo", poseTo);
+
+        // ---- the land layers ----------------------------------------------------------------------------------
+        var camEl = stageEl.querySelector(".camera");
+        camEl.querySelector(".land").setAttribute("d", data.land);
+        camEl.querySelector(".river").setAttribute("d", data.rivers || "");
+        var span = Math.max(camFrom.span, camTo.span);
+        camEl.querySelector(".grid").setAttribute("d", lib.graticulePath(project, data.window, span));
+        if (V.borders !== "none") {
+          if (!data.borders) throw new Error("map-route: the " + V.region + " map data has no borders");
+          camEl.querySelector(".border").setAttribute("d", data.borders);
+        }
+        if (V.borders === "regions") {
+          if (!data.regions) throw new Error("map-route: the " + V.region + " map data has no first-level regions");
+          camEl.querySelector(".region").setAttribute("d", data.regions);
+        }
+
+        // ---- pins, in screen pixels of the held camera ------------------------------------------------------
+        var DOT = 11;
+        var DOT_FOCUS = 16;
+        var GAP = 14; // between a dot and its label
+        var PAD = 8; // clearance between boxes
+
+        var pins = lib.readPins(V.pins, data.cities, V.region).map(function (pin) {
+          var xy = project(pin.lon, pin.lat);
+          pin.x = W / 2 + (xy[0] - poseTo.cx) * poseTo.s;
+          pin.y = H / 2 + (xy[1] - poseTo.cy) * poseTo.s;
+          pin.r = pin.kind === "region" ? 0 : pin.kind === "focus" ? DOT_FOCUS : DOT;
+          if (pin.x < safe.x0 + pin.r || pin.x > safe.x1 - pin.r || pin.y < safe.y0 + pin.r || pin.y > safe.y1 - pin.r) {
+            throw new Error("map-route: pin " + pin.id + " is outside the safe zone at cameraTo; widen the span or move the camera");
+          }
+          return pin;
+        });
+        var shown = pins.filter(function (pin) {
+          return pin.kind !== "via";
+        });
+        var byId = {};
+        pins.forEach(function (pin) {
+          byId[pin.id] = pin;
+        });
+        var routePins = lib.readRoute(V.route, pins).map(function (id) {
+          return byId[id];
+        });
+
+        // ---- the route, drawn in pixels; its length is measured here ----------------------------------------
+        var routeEl = stageEl.querySelector(".route");
+        var revealEl = routeEl.querySelector(".route-reveal");
+        var routeLength = 0;
+        var routeSamples = [];
+        if (routePins.length > 1) {
+          var pathD = lib.splinePath(routePins);
+          routeEl.setAttribute("data-style", V.routeStyle);
+          ["route-core", "route-ties", "route-reveal"].forEach(function (name) {
+            routeEl.querySelector("." + name).setAttribute("d", pathD);
+          });
+          routeLength = revealEl.getTotalLength();
+          for (var along = 0; along <= routeLength; along += 20) {
+            var point = revealEl.getPointAtLength(along);
+            routeSamples.push([point.x, point.y]);
+          }
+          revealEl.setAttribute("stroke-dasharray", String(routeLength));
+        }
+
+        // ---- the date and the caption in a corner ---------------------------------------------------------------
+        var yearEl = rootEl.querySelector(".year");
+        var captionEl = rootEl.querySelector(".caption");
+        yearEl.textContent = V.yearLabel;
+        captionEl.textContent = V.caption;
+        yearEl.style.display = V.yearLabel ? "block" : "none";
+        captionEl.style.display = V.caption ? "block" : "none";
+        var dotBoxes = shown
+          .filter(function (pin) {
+            return pin.kind !== "region";
+          })
+          .map(function (pin) {
+            return { x0: pin.x - pin.r, y0: pin.y - pin.r, x1: pin.x + pin.r, y1: pin.y + pin.r };
+          });
+        var sizes = {
+          year: number("--size-title"),
+          label: labelSize,
+          captionWidth: number("--caption-width"),
+          gap: number("--corner-gap"),
+        };
+        var corner = lib.cornerLayout(V.yearLabel, V.caption, sizes, safe, dotBoxes, routeSamples, PAD);
+        rootEl.querySelector(".corner").setAttribute("data-corner", corner ? corner.side : "left");
+
+        // ---- the labels, placed from the measured widths --------------------------------------------------
+        var items = shown
+          .filter(function (pin) {
+            return pin.kind === "focus";
+          })
+          .concat(
+            shown.filter(function (pin) {
+              return pin.kind !== "focus";
+            }),
+          )
+          .map(function (pin) {
+            var isRegion = pin.kind === "region";
+            var size = pin.kind === "focus" ? focusSize : labelSize;
+            var text = isRegion ? pin.label.toUpperCase() : pin.label;
+            var width = lib.textWidth(text, size, lib.ADVANCE_LABEL, isRegion ? 0.32 : 0);
+            return {
+              id: pin.id,
+              region: isRegion,
+              side: pin.side,
+              x: pin.x,
+              y: pin.y,
+              r: pin.r,
+              w: width * (pin.kind === "focus" ? 1.05 : 1),
+              h: size * 1.15,
+            };
+          });
+        var hard = dotBoxes.slice();
+        if (corner) hard.push(corner.box);
+        var placement = lib.placeLabels(items, hard, routeSamples, safe, GAP, PAD);
+
+        // ---- the elements of the pins ----------------------------------------------------------------------------
+        var pinsEl = rootEl.querySelector(".pins");
+        var pinNodes = {};
+        function px(value) {
+          return value.toFixed(1) + "px";
+        }
+        shown.forEach(function (pin) {
+          var r = pin.r;
+          var nodes = { dot: null, ring: null, label: null };
+          if (pin.kind !== "region") {
+            ["dot", "ring"].forEach(function (part) {
+              var el = document.createElement("div");
+              el.className = "pin-" + part;
+              el.setAttribute("data-kind", pin.kind);
+              el.style.left = px(pin.x - r);
+              el.style.top = px(pin.y - r);
+              el.style.width = px(r * 2);
+              el.style.height = px(r * 2);
+              pinsEl.appendChild(el);
+              nodes[part] = el;
+            });
+          }
+          var labelEl = document.createElement("div");
+          labelEl.className = "pin-label";
+          labelEl.setAttribute("data-kind", pin.kind);
+          labelEl.textContent = pin.label;
+          var chosen = placement[pin.id];
+          labelEl.style.top = px(chosen.box.y0);
+          if (chosen.side === "left") {
+            labelEl.style.right = px(W - chosen.box.x1);
+          } else if (chosen.side === "right") {
+            labelEl.style.left = px(chosen.box.x0);
+          } else {
+            labelEl.style.left = px(pin.x);
+            gsap.set(labelEl, { xPercent: -50 });
+          }
+          pinsEl.appendChild(labelEl);
+          nodes.label = labelEl;
+          pinNodes[pin.id] = nodes;
+        });
+
+        // ---- the timeline --------------------------------------------------------------------------------------------
+        var duration = Number.parseFloat(V.durationSeconds);
+        var plan = lib.planTimeline({
+          t: t,
+          width: W,
+          locked: locked,
+          poseFrom: poseFrom,
+          poseTo: poseTo,
+          shown: shown,
+          routeLength: routeLength,
+          yearLabel: V.yearLabel,
+          caption: V.caption,
+        });
+        // A slot too short for the move, the entrances, the reading time and the fade out fails the render.
+        var problem = lib.slotProblem(plan, V.durationSeconds, t.exit);
+        if (problem) throw new Error(problem);
+
+        var tl = gsap.timeline({ paused: true });
+        tl.fromTo(stageEl, { opacity: 0 }, { opacity: 1, duration: t.enter, ease: easeEnter }, 0);
+
+        // The camera move comes first. Its easing is baked into sampled poses (30 a second) so each segment is
+        // straight (the linear ease is allowed by data-linear-ok on the group) and seeking is exact.
+        gsap.set(camEl, { svgOrigin: "0 0" });
+        if (locked) {
+          gsap.set(camEl, lib.cameraTransform(poseFrom, poseTo, 1, W, H));
+        } else {
+          var easeFn = gsap.parseEase(easeMove);
+          var segments = Math.max(8, Math.ceil(plan.moveSeconds * 30));
+          for (var k = 0; k < segments; k++) {
+            var from = lib.cameraTransform(poseFrom, poseTo, easeFn(k / segments), W, H);
+            var to = lib.cameraTransform(poseFrom, poseTo, easeFn((k + 1) / segments), W, H);
+            Object.assign(to, { duration: plan.moveSeconds / segments, ease: "none", immediateRender: k === 0 });
+            tl.fromTo(camEl, from, to, (plan.moveSeconds * k) / segments);
+          }
+        }
+
+        // Then, with the camera held: the pins, the route, the date, the caption.
+        plan.arrivals.forEach(function (arrival) {
+          var nodes = pinNodes[arrival.id];
+          if (nodes.dot) {
+            tl.fromTo(nodes.dot, { opacity: 0, scale: 0.6 }, { opacity: 1, scale: 1, duration: t.micro, ease: easeEnter }, arrival.at);
+            // one ring, once: it appears at the dot (its hidden state is the "from" of the first tween, so a seek
+            // from any time lands the same), then grows and fades
+            var ringAt = arrival.at + 0.1;
+            tl.fromTo(nodes.ring, { opacity: 0, scale: 1 }, { opacity: 0.7, scale: 1.3, duration: t.micro / 2, ease: easeEnter }, ringAt);
+            tl.fromTo(
+              nodes.ring,
+              { opacity: 0.7, scale: 1.3 },
+              { opacity: 0, scale: 2.8, duration: 0.75, ease: easeEnter, immediateRender: false },
+              ringAt + t.micro / 2,
+            );
+          }
+          tl.fromTo(nodes.label, { opacity: 0, y: 12 }, { opacity: 1, y: 0, duration: t.enter, ease: easeEnter }, arrival.labelAt);
+        });
+        if (routeLength > 0) {
+          tl.fromTo(revealEl, { strokeDashoffset: routeLength }, { strokeDashoffset: 0, duration: plan.routeSeconds, ease: easeMove }, plan.routeAt);
+        }
+        if (V.yearLabel) {
+          tl.fromTo(yearEl, { opacity: 0, y: 16 }, { opacity: 1, y: 0, duration: t.enter, ease: easeEnter }, plan.yearAt);
+        }
+        if (V.caption) {
+          tl.fromTo(captionEl, { opacity: 0, y: 16 }, { opacity: 1, y: 0, duration: t.enter, ease: easeEnter }, plan.captionAt);
+        }
+
+        tl.fromTo(stageEl, { opacity: 1 }, { opacity: 0, duration: t.exit, ease: easeExit, immediateRender: false }, duration - t.exit);
+
+        window.__timelines = window.__timelines || {};
+        window.__timelines["map-route"] = tl;
+      })();
+    </script>
+  </body>
+</html>

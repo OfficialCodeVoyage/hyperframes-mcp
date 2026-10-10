@@ -1,0 +1,9 @@
+[
+  {"word": "On", "start": 0.2, "end": 0.4}, {"word": "April", "start": 0.5, "end": 0.8},
+  {"word": "twelfth", "start": 0.9, "end": 1.4}, {"word": "the", "start": 3.0, "end": 3.1},
+  {"word": "auditors", "start": 3.3, "end": 3.8}, {"word": "rode", "start": 3.9, "end": 4.2},
+  {"word": "down", "start": 4.6, "end": 4.8}, {"word": "into", "start": 5.0, "end": 5.2},
+  {"word": "the", "start": 5.3, "end": 5.4}, {"word": "vault.", "start": 5.8, "end": 6.7},
+  {"word": "The", "start": 7.0, "end": 7.2}, {"word": "ledger", "start": 7.3, "end": 7.7},
+  {"word": "was", "start": 7.8, "end": 7.9}, {"word": "counted.", "start": 8.0, "end": 8.6}
+]

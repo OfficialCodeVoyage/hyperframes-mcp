@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "hyperframes-edit": {
+      "command": "hyperframes-mcp",
+      "args": ["serve"]
+    }
+  }
+}

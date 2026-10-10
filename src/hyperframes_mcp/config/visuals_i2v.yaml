@@ -1,0 +1,22 @@
+# Settings of the clip tool (quote_clip and confirm_spend): which model animates a picture and how much one video may
+# spend on clips. A copy of this file at ~/.hyperframes-mcp/config/visuals_i2v.yaml replaces it.
+i2v:
+  # What fal is asked for: any key of providers/video/pricing.py and a length it supports.
+  model: veo-3.1-lite
+  clip_seconds: 4
+  # The per-video cap, enforced by ClipBudget before every provider call. A failed attempt counts
+  # as an attempt and, once the job reached the provider, as spend.
+  limits:
+    max_clips: 6              # clips per video
+    max_attempts_per_clip: 3
+    max_total_seconds: 30
+    # the per-video clip ceiling in USD: a hard stop, on top of the per-project limit of limits.yaml
+    max_spend_usd: 2.25
+  download:                   # stock downloader pattern: https only, byte cap, total deadline
+    max_clip_mb: 100
+    timeout_seconds: 300
+  queue:
+    poll_interval_seconds: 2
+    job_timeout_seconds: 600
+  max_still_mb: 7             # the still is sent inline as a data URI; Veo documents 8 MB
+  ledger_db: i2v_clips.db     # where the attempt log is kept, in ~/.hyperframes-mcp/data (survives restarts)

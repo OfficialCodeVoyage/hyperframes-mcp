@@ -1,0 +1,492 @@
+{
+  "name": "hyperframes-mcp-motion",
+  "items": [
+    {
+      "name": "credit-line",
+      "type": "hyperframes:block",
+      "title": "Credit line",
+      "description": "An archival source credit in a lower corner, inside the safe zone: label type at credit size on a scrim, a fade in, a hold of at least the reading time, a fade out.",
+      "license": "Apache-2.0",
+      "files": [
+        {
+          "path": "blocks/credit-line.html",
+          "target": "compositions/credit-line.html",
+          "type": "hyperframes:composition"
+        }
+      ],
+      "registryDependencies": [],
+      "dimensions": {"width": 1920, "height": 1080},
+      "duration": 6.2,
+      "variables": [
+        {"id": "durationSeconds", "type": "number", "label": "Seconds on screen, fade in and fade out included", "default": 6.2, "min": 2.4, "max": 14, "step": 0.1, "unit": "s"},
+        {"id": "text", "type": "string", "label": "Credit text", "default": "Library of Congress, Prints and Photographs Division. Public domain.", "maxLength": 140},
+        {"id": "align", "type": "enum", "label": "Side of the frame", "default": "left", "options": [{"value": "left", "label": "Left"}, {"value": "right", "label": "Right"}]}
+      ],
+      "source": null,
+      "notes": "Hand-written for the library; shares no code with the HyperFrames catalog. The timeline fills durationSeconds exactly: the fade in starts at 0, the fade out ends at the end. A slot shorter than enter + (read_min + read_per_word x words of the text) + exit throws."
+    },
+    {
+      "name": "counter",
+      "type": "hyperframes:block",
+      "title": "Counter",
+      "description": "A count-up to a target in gold on a soft scrim: the figure arrives, counts over the cinematic duration with the emphasis ease and lands exactly on the target, then the unit and the label arrive; tabular figures, a small settle that never overshoots.",
+      "license": "Apache-2.0",
+      "files": [
+        {
+          "path": "blocks/counter.html",
+          "target": "compositions/counter.html",
+          "type": "hyperframes:composition"
+        }
+      ],
+      "registryDependencies": [],
+      "dimensions": {"width": 1920, "height": 1080},
+      "duration": 8,
+      "variables": [
+        {"id": "durationSeconds", "type": "number", "label": "Seconds on screen, arrival and fade out included", "default": 8, "min": 5, "max": 16, "step": 0.1, "unit": "s"},
+        {"id": "from", "type": "number", "label": "Value the count starts from", "default": 0, "step": 1},
+        {"id": "to", "type": "number", "label": "Target value the count lands on", "default": 8198, "step": 1},
+        {"id": "prefix", "type": "string", "label": "Text before the figure, such as a currency sign", "default": "", "maxLength": 8},
+        {"id": "suffix", "type": "string", "label": "Unit after the figure, shown when the count lands", "default": "bars", "maxLength": 24},
+        {"id": "decimals", "type": "number", "label": "Decimal places", "default": 0, "min": 0, "max": 4, "step": 1},
+        {"id": "label", "type": "string", "label": "Line under the figure", "default": "of bullion counted in the mine", "maxLength": 80},
+        {"id": "thousandsSeparator", "type": "boolean", "label": "Group thousands with a comma", "default": true}
+      ],
+      "source": null,
+      "notes": "Hand-written; the idea follows the HyperFrames registry count-up (tabular figures, an exact landing), no code copied. The count is a proxy object tweened with the emphasis ease and shown by a GSAP modifier on every render of the tween, not by onUpdate (a callback: a quiet seek past the end of the count would leave the text short of the target), so the text is exact at every frame and after any seek. The count takes the slot's spare time between the cinematic minimum and maximum; the slot must also hold the arrival, the unit and label, the reading time and the fade out, or it throws."
+    },
+    {
+      "name": "ledger",
+      "type": "hyperframes:block",
+      "title": "Ledger",
+      "description": "A paper ledger sheet on the night ground that fills row by row: each row is written by a left-to-right clip-path at the narration's cue, faint ruled lines, numbers right-aligned in tabular figures, an oxblood total whose rule is drawn with scaleX, and an optional big gold figure that lands last.",
+      "license": "Apache-2.0",
+      "files": [
+        {
+          "path": "blocks/ledger.html",
+          "target": "compositions/ledger.html",
+          "type": "hyperframes:composition"
+        }
+      ],
+      "registryDependencies": [],
+      "dimensions": {"width": 1920, "height": 1080},
+      "duration": 12,
+      "variables": [
+        {"id": "durationSeconds", "type": "number", "label": "Seconds on screen, arrival and fade out included", "default": 12, "min": 6, "max": 40, "step": 0.1, "unit": "s"},
+        {"id": "title", "type": "string", "label": "Heading of the sheet", "default": "Vault inventory", "maxLength": 24},
+        {"id": "rows", "type": "string", "label": "Rows as JSON, at most 8: [{\"label\":\"Gold bars\",\"value\":\"8,198\",\"unit\":\"bars\"}]", "default": "[{\"label\":\"Gold bars\",\"value\":\"8,198\",\"unit\":\"bars\"},{\"label\":\"Silver ingots\",\"value\":\"1,420\",\"unit\":\"ingots\"},{\"label\":\"Banknote sacks\",\"value\":\"711\",\"unit\":\"sacks\"},{\"label\":\"Art crates\",\"value\":\"55\",\"unit\":\"crates\"}]"},
+        {"id": "total", "type": "string", "label": "Total line as JSON: {\"label\":\"Items counted\",\"value\":\"10,384\"}", "default": "{\"label\":\"Items counted\",\"value\":\"10,384\"}"},
+        {"id": "bigFigure", "type": "string", "label": "Big figure as JSON {\"value\":\"98.6%\",\"caption\":\"...\"}, or empty for none", "default": "{\"value\":\"98.6%\",\"caption\":\"of the gold, per the final balance sheet\"}"},
+        {"id": "rowTimes", "type": "string", "label": "Seconds in the slot at which each row appears, as a JSON list, or empty to space them evenly", "default": ""}
+      ],
+      "source": null,
+      "notes": "Hand-written; the idea follows the typed inventory of an earlier prototype, whose per-character timers, hard-coded sizes and positions are replaced by clip-path wipes, tokens and layout rules. The sheet is sized from the rows (at most 8, all of them inside the safe zone; more rows, or a label longer than its column, throws). Rows come at rowTimes or evenly spaced; each wipe ends before the next starts. The big figure lands last with the emphasis ease. A slot too short for the rows, the total, the big figure and the reading time throws."
+    },
+    {
+      "name": "bar-grid",
+      "type": "hyperframes:block",
+      "title": "Bar grid",
+      "description": "A pictogram that makes a large count visible: a grid with one small bar glyph per bar (up to 20000), filled in coloured segments from the top left as the narrator speaks, each a wave of cells that light, flash and settle. A legend row per segment counts up with the fill, and a full segment's outline pulses once and stays, so a small part is seen against the whole.",
+      "license": "Apache-2.0",
+      "files": [
+        {
+          "path": "blocks/bar-grid.html",
+          "target": "compositions/bar-grid.html",
+          "type": "hyperframes:composition"
+        }
+      ],
+      "registryDependencies": [],
+      "dimensions": {"width": 1920, "height": 1080},
+      "duration": 8,
+      "variables": [
+        {"id": "durationSeconds", "type": "number", "label": "Seconds on screen, entrance and fade out included", "default": 8, "min": 4, "max": 40, "step": 0.1, "unit": "s"},
+        {"id": "title", "type": "string", "label": "What the grid is, at most 70 characters", "default": "Marburg: gold bars in the first partial count", "maxLength": 70},
+        {"id": "total", "type": "number", "label": "Number of cells in the grid, 1 to 20000: one glyph per bar", "default": 8198, "min": 1, "max": 20000, "step": 1},
+        {"id": "segments", "type": "string", "label": "Segments as JSON, at most 5, filled in order from the top left: [{\"count\":8198,\"label\":\"found in the partial count\",\"tone\":\"gold\",\"at\":0.4,\"seconds\":3}]; tone is gold, paper, ember or mute; at is the second of the slot when the fill starts; label at most 38 characters", "default": "[{\"count\":8198,\"label\":\"found in the partial count\",\"tone\":\"gold\",\"at\":0.4,\"seconds\":3}]"},
+        {"id": "unit", "type": "string", "label": "What one cell is, after each count; may be empty", "default": "bars", "maxLength": 16},
+        {"id": "note", "type": "string", "label": "Small line under the legend; may be empty", "default": "", "maxLength": 66}
+      ],
+      "source": null,
+      "notes": "Hand-written; the idea is the pictogram, no code copied. The grid is two canvases of one trapezoid bar glyph per cell (the largest whole-pixel pitch, 3:2, whose rows fit 640 px): the empty cells are drawn once, the lit cells are redrawn from the time alone by a GSAP modifier on one linear ticker (data-linear-ok), not by onUpdate, so a seek, a backward seek and the runtime's quiet seek all draw the same frame. Segments fill in order from the top left; the k-th cell of a segment starts at at + (seconds - trail) * k / count and takes a trail of at most 0.5 s to settle, so every cell is lit by at + seconds. The legend count is the number of cells started, so the figure and the picture agree. The slot minimum is the end of the last segment to fill, the entrance (the outline pulse), the reading time of that segment's label (read_min plus read_per_word a word) and the exit; bad JSON, a tone that is not gold, paper, ember or mute, a negative time, counts over total, a segment that ends after the slot and a label over 38 characters or wider than the legend each throw, naming the variable."
+    },
+    {
+      "name": "lower-third",
+      "type": "hyperframes:block",
+      "title": "Lower third",
+      "description": "A name and a role in a bottom corner inside the safe zone: a paper band with a double rule in ink that draws across it, the name in the display font and the role in the label font, a hold of at least the lower-third minimum, a faster fade out.",
+      "license": "Apache-2.0",
+      "files": [
+        {
+          "path": "blocks/lower-third.html",
+          "target": "compositions/lower-third.html",
+          "type": "hyperframes:composition"
+        }
+      ],
+      "registryDependencies": [],
+      "dimensions": {"width": 1920, "height": 1080},
+      "duration": 6,
+      "variables": [
+        {"id": "durationSeconds", "type": "number", "label": "Seconds on screen, entrance and exit included", "default": 6, "min": 5.7, "max": 8, "step": 0.1, "unit": "s"},
+        {"id": "name", "type": "string", "label": "Name", "default": "Jay Cooke", "maxLength": 40},
+        {"id": "role", "type": "string", "label": "Role and years", "default": "Financier, 1821–1905", "maxLength": 64},
+        {"id": "side", "type": "enum", "label": "Corner of the frame", "default": "left", "options": [{"value": "left", "label": "Left"}, {"value": "right", "label": "Right"}]}
+      ],
+      "source": {
+        "url": "https://github.com/heygen-com/hyperframes/tree/568dc2ae5bbc0fc7f3acce5b3f6e745f7b1c670c/registry/blocks/lt-accent-underline",
+        "sha": "568dc2ae5bbc0fc7f3acce5b3f6e745f7b1c670c"
+      },
+      "notes": "Adapted from the HyperFrames block lt-accent-underline (Apache-2.0, Copyright 2026 HeyGen, Inc.): kept the stack of name, drawn rule and role and the staggered entrance. Changed: name, role and side are variables; a paper band (wiped in by clipPath) with a double rule in ink (scaleX) replaces the cardless text shadow; display font for the name, label font for the role, all colours, sizes, fonts, durations and eases from the tokens; the text rises 16 px; the exit is a 0.5 s fade of the whole band (the entrance is 0.7 s); no hard visibility switch, the timeline ends at durationSeconds; a slot shorter than entrance + max(lower_third_hold_min, reading time of the words) + exit throws."
+    },
+    {
+      "name": "act-title",
+      "type": "hyperframes:block",
+      "title": "Act title",
+      "description": "A full-screen act title on the night ground: a gold kicker, the title revealed word by word through a clip-path mask, a thin gold rule and an optional subtitle, a hold of at least 2.5 seconds, and a fade of the whole block.",
+      "license": "Apache-2.0",
+      "files": [
+        {
+          "path": "blocks/act-title.html",
+          "target": "compositions/act-title.html",
+          "type": "hyperframes:composition"
+        }
+      ],
+      "registryDependencies": [],
+      "dimensions": {"width": 1920, "height": 1080},
+      "duration": 6.5,
+      "coversFrame": true,
+      "variables": [
+        {"id": "durationSeconds", "type": "number", "label": "Seconds on screen, entrance and exit included", "default": 6.5, "min": 4.5, "max": 14, "step": 0.1, "unit": "s"},
+        {"id": "kicker", "type": "string", "label": "Kicker, a small gold label above the title", "default": "Part 2", "maxLength": 24},
+        {"id": "title", "type": "string", "label": "Title", "default": "The Panic of 1873", "maxLength": 70},
+        {"id": "subtitle", "type": "string", "label": "Subtitle (may be empty)", "default": "How a railroad boom broke the banks", "maxLength": 110}
+      ],
+      "source": {
+        "url": "https://github.com/heygen-com/hyperframes/tree/568dc2ae5bbc0fc7f3acce5b3f6e745f7b1c670c/registry/components/titlecard-calm",
+        "sha": "568dc2ae5bbc0fc7f3acce5b3f6e745f7b1c670c"
+      },
+      "notes": "Adapted from the HyperFrames component titlecard-calm (Apache-2.0, Copyright 2026 HeyGen, Inc.): kept the kicker over a large title, kicker first, and the fade of the whole lockup at the end. Changed: a block on the 1920 by 1080 canvas (the container-query sizing is dropped); kicker, title and subtitle are variables; night ground, gold kicker and rule, paper title; the title is revealed word by word through clipPath masks (word stagger 0.1 s, squeezed to a 0.5 s total for long titles) instead of a fade; no drift during the hold (the original eases a sine); the timeline fills durationSeconds exactly (the original compresses its phases); a slot shorter than entrance + max(2.5 s, reading time of every word) + exit throws."
+    },
+    {
+      "name": "quote-card",
+      "type": "hyperframes:block",
+      "title": "Quote card",
+      "description": "A primary-source quote on a paper card over the night ground: the quote in the display italic (ink on paper) under an oxblood opening mark, revealed line by line, then the attribution in the label font and the source line; a hold of at least the reading time of the quote.",
+      "license": "MIT",
+      "files": [
+        {
+          "path": "blocks/quote-card.html",
+          "target": "compositions/quote-card.html",
+          "type": "hyperframes:composition"
+        }
+      ],
+      "registryDependencies": [],
+      "dimensions": {"width": 1920, "height": 1080},
+      "duration": 10.5,
+      "coversFrame": true,
+      "variables": [
+        {"id": "durationSeconds", "type": "number", "label": "Seconds on screen, entrance and exit included", "default": 10.5, "min": 3.2, "max": 20, "step": 0.1, "unit": "s"},
+        {"id": "quote", "type": "string", "label": "The quote, word for word from the source", "default": "The only thing we have to fear is fear itself — nameless, unreasoning, unjustified terror which paralyzes needed efforts to convert retreat into advance.", "maxLength": 220},
+        {"id": "attribution", "type": "string", "label": "Who said or wrote it", "default": "Franklin D. Roosevelt", "maxLength": 60},
+        {"id": "source", "type": "string", "label": "Where it comes from: document, date, licence", "default": "First inaugural address, 4 March 1933. Public domain.", "maxLength": 90}
+      ],
+      "source": {
+        "url": "https://github.com/nateherkai/hyperframes-student-kit/tree/0d30152a82b9ceb93cfdd9bdbf46f0d5ab3cde86/style-library/01-vox-explainer/cards/tier2",
+        "sha": "0d30152a82b9ceb93cfdd9bdbf46f0d5ab3cde86"
+      },
+      "notes": "Adapted from the pull-quote card t2-lb-pullquote.html of the HyperFrames student kit (MIT, Copyright (c) 2026 Nate Herk): kept the large opening quotation mark, the quote and the attribution line under it. Changed: quote, attribution and source are variables; a paper card over the night ground, not a transparent overlay; ink italic quote in the display font, oxblood mark, label-font attribution, a source line at the credit size; all colours, sizes, fonts, durations and eases from the tokens; no overshoot, no steps, no scale pop (the card fades and rises 20 px); the quote is broken into lines in the script from the advance widths of Newsreader Italic (a table checked against the font file by a test), set at the largest of the subtitle, body and minimum text sizes at which it fits a 420 px tall block (five, six or seven lines), so a 220 character quote cannot overflow the card and a quote that cannot fit even at the minimum text size throws, and each line is revealed through its own clipPath (0.25 s apart, squeezed to a 0.5 s total); the timeline fills durationSeconds exactly; a slot shorter than entrance + max(1.2 s, 0.3 s a word of the quote) + exit throws."
+    },
+    {
+      "name": "newspaper-clipping",
+      "type": "hyperframes:block",
+      "title": "Newspaper clipping",
+      "description": "A paper cutout with seeded torn edges, a fixed slight tilt and two tape strips, laid on the night ground: source line, dateline, headline, short body, an optional halftone photo and a marker highlight. Only ever a real archival document, so a source label is required.",
+      "license": "Apache-2.0 AND MIT",
+      "files": [
+        {
+          "path": "blocks/newspaper-clipping.html",
+          "target": "compositions/newspaper-clipping.html",
+          "type": "hyperframes:composition"
+        }
+      ],
+      "registryDependencies": [],
+      "dimensions": {"width": 1920, "height": 1080},
+      "duration": 11,
+      "slotNotChecked": "its shortest slot grows with the words of the headline and the body and with the marker highlight, and the block has no browser-free function for it yet; only the static minimum is checked",
+      "variables": [
+        {"id": "durationSeconds", "type": "number", "label": "Seconds on screen, entrance and exit included", "default": 11, "min": 2.4, "max": 30, "step": 0.1, "unit": "s"},
+        {"id": "sourceLabel", "type": "string", "label": "Provenance: where the real document comes from (required)", "default": "Sample newspaper, SAMPLE archive", "maxLength": 110},
+        {"id": "dateline", "type": "string", "label": "Dateline in the clipping", "default": "SAMPLE CITY, SAMPLE DATE", "maxLength": 60},
+        {"id": "headline", "type": "string", "label": "Headline", "default": "SAMPLE: the headline of a clipping", "maxLength": 110},
+        {"id": "body", "type": "string", "label": "Body text, about 60 words at most", "default": "SAMPLE TEXT. This is neutral placeholder copy for a newspaper clipping, not a real document. The real body is the archival text of the story.", "maxLength": 420},
+        {"id": "image", "type": "string", "label": "Photo, a path inside the project (optional, shown as a halftone)", "default": "", "placeholder": "projects/TOPIC/photo.jpg", "maxLength": 200},
+        {"id": "highlight", "type": "string", "label": "Words of the headline or body to mark (optional)", "default": "", "maxLength": 80},
+        {"id": "edgeSeed", "type": "number", "label": "Seed of the torn edge", "default": 7, "min": 0, "max": 9999, "step": 1},
+        {"id": "side", "type": "enum", "label": "Side of the frame", "default": "center", "options": [{"value": "left", "label": "Left"}, {"value": "center", "label": "Centre"}, {"value": "right", "label": "Right"}]}
+      ],
+      "source": {
+        "url": "https://github.com/heygen-com/hyperframes/tree/568dc2ae5bbc0fc7f3acce5b3f6e745f7b1c670c/registry/components/torn-paper-rip",
+        "sha": "568dc2ae5bbc0fc7f3acce5b3f6e745f7b1c670c"
+      },
+      "notes": "Structure studied, code rewritten. From torn-paper-rip (Apache-2.0): one seeded edge table with a slow value-noise wander plus a per-vertex fibre jitter, and a lighter paper-core band along the tear; here the generator is mulberry32 seeded by edgeSeed and the edge is static (no tear animation, no filter, no shadow). From freeze-frame-dressing (same repository and commit): translucent tape strips. From t1-section-tornstrip and t1-section-classified of nateherkai/hyperframes-student-kit (MIT, commit 0d30152a82b9ceb93cfdd9bdbf46f0d5ab3cde86): a title on a clip-path torn paper strip and taped paper cards. Changed: tokens only (night and paper), Newsreader headline, label-font body, oxblood dateline, no drop shadows, no CDN, fromTo on one paused timeline with token eases, the entrance is a 20 px rise and the last degree of a fixed -1.2 degree tilt, one 3 percent push-in, a fast exit, a marker highlight (one box per word, scaleX, multiply) after the headline can be read. sourceLabel is required (the clipping is only ever a real archival document) and the defaults are marked SAMPLE. The timeline is built after the fonts load (layout depends on them) and registered then; a text that does not fit the safe zone throws."
+    },
+    {
+      "name": "photo-shot",
+      "type": "hyperframes:block",
+      "title": "Photo shot",
+      "description": "A full-frame archival photograph with one slow camera move (Ken Burns) between two crops, graded and finished (vignette and grain) through data-color-grading, with an optional scrim.",
+      "license": "Apache-2.0",
+      "files": [
+        {
+          "path": "blocks/photo-shot.html",
+          "target": "compositions/photo-shot.html",
+          "type": "hyperframes:composition"
+        }
+      ],
+      "registryDependencies": [],
+      "dimensions": {"width": 1920, "height": 1080},
+      "duration": 6,
+      "coversFrame": true,
+      "needsCredit": true,
+      "variables": [
+        {"id": "durationSeconds", "type": "number", "label": "Seconds on screen, the whole camera move included", "default": 6, "min": 1.2, "max": 60, "step": 0.1, "unit": "s"},
+        {"id": "image", "type": "string", "label": "Photograph, a path relative to the project (a sample project supplies the default)", "default": "assets/img/sample-photo.jpg", "maxLength": 200},
+        {"id": "from", "type": "string", "label": "Camera frame at the start: [x, y, width, height] as fractions of the image, 16:9 on screen", "default": "[0, 0, 1, 1]", "maxLength": 80},
+        {"id": "to", "type": "string", "label": "Camera frame at the end, same form and the same aspect as the start", "default": "[0.12, 0.1, 0.8, 0.8]", "maxLength": 80},
+        {"id": "grade", "type": "string", "label": "Grade for data-color-grading: JSON of exposure, contrast, temperature and the other adjustments", "default": "{\"exposure\":0,\"contrast\":0.05,\"temperature\":0.05}", "maxLength": 300},
+        {"id": "scrim", "type": "enum", "label": "Darkening behind text", "default": "bottom", "options": [{"value": "none", "label": "None"}, {"value": "left", "label": "Left"}, {"value": "bottom", "label": "Bottom"}]}
+      ],
+      "source": null,
+      "notes": "Hand-written; the wrapper structure and the data-color-grading use follow an earlier prototype. No photograph is stored in the library: the default image (assets/img/sample-photo.jpg, a 16:9 picture) is a path a sample project supplies, and the default crops assume a 16:9 picture. For another aspect a crop is [x, y, w, h] with h = w x (9/16) x (image width / image height); the layer takes its shape from the start crop, so a wrong aspect stretches the picture. The move is clamped inside the component: the end crop is pulled back along its own direction until the pan is at most camera.max_pan_px_per_s and the zoom at most camera.max_zoom_per_s at the fastest moment of the power1.inOut ease (twice the mean speed), so a 6 s shot pans at most 45 px/s on average. The grade variable's adjustments are added to the library finish (vignette and grain from tokens.finish, applied always); src/hyperframes_mcp/motion/grade.py gives the exposure and contrast that level a photograph. The graded <img> is never given an opacity tween: the composer cross-fades shots by fading a wrapper."
+    },
+    {
+      "name": "video-shot",
+      "type": "hyperframes:block",
+      "title": "Video shot",
+      "description": "A full-frame silent image-to-video clip (an MP4 of a few seconds) shown for the length of its slot, cropped to cover the frame, graded and finished (vignette and grain) through data-color-grading like a photograph, with an optional scrim. When the slot is longer than the clip, the last frame is held or the clip plays again.",
+      "license": "Apache-2.0",
+      "files": [
+        {
+          "path": "blocks/video-shot.html",
+          "target": "compositions/video-shot.html",
+          "type": "hyperframes:composition"
+        }
+      ],
+      "registryDependencies": [],
+      "dimensions": {"width": 1920, "height": 1080},
+      "duration": 6,
+      "coversFrame": true,
+      "needsCredit": true,
+      "variables": [
+        {"id": "durationSeconds", "type": "number", "label": "Seconds on screen, the whole slot", "default": 6, "min": 1.2, "max": 60, "step": 0.1, "unit": "s"},
+        {"id": "video", "type": "string", "label": "Clip, an MP4 path relative to the project (a sample project supplies the default)", "default": "assets/video/sample-clip.mp4", "maxLength": 200},
+        {"id": "trimStart", "type": "number", "label": "Seconds into the clip where playback starts", "default": 0, "min": 0, "max": 600, "step": 0.1, "unit": "s"},
+        {"id": "grade", "type": "string", "label": "Grade for data-color-grading: JSON of exposure, contrast, temperature and the other adjustments", "default": "{\"exposure\":0,\"contrast\":0.05,\"temperature\":0.05}", "maxLength": 300},
+        {"id": "scrim", "type": "enum", "label": "Darkening behind text", "default": "bottom", "options": [{"value": "none", "label": "None"}, {"value": "left", "label": "Left"}, {"value": "bottom", "label": "Bottom"}]},
+        {"id": "hold", "type": "enum", "label": "When the slot is longer than the clip after trimStart", "default": "freeze", "options": [{"value": "freeze", "label": "Freeze the last frame"}, {"value": "loop", "label": "Play it again from trimStart"}]}
+      ],
+      "source": null,
+      "notes": "Hand-written; the wrapper, scrim and the data-color-grading use follow photo-shot. No clip is stored in the library: the default video (assets/video/sample-clip.mp4) is a path a sample project supplies. The clip is silent (muted, no audio attribute, and the composer never mixes it) and is always shown to cover the frame (object-fit cover), so a clip that is not 16:9 is cropped. The renderer decodes the clip itself (HyperFrames pre-extracts the frames and seeks by time); the block sets the element's src, data-duration, data-media-start and loop from the variables and never plays, pauses or seeks it. The markup's src is an empty data URL (never a file) and the markup has no data-duration: the renderer moves a video to its mount's start only when it finds a src in the markup, and a duration written there would cap the clip (docs/motion-library.md, video-shot)."
+    },
+    {
+      "name": "date-stamp",
+      "type": "hyperframes:block",
+      "title": "Date stamp",
+      "description": "A date over a photograph in a safe-zone corner: a short gold rule that draws, the date revealed left to right in the display face on a dark plate, a hold of at least the reading time, a faster fade out.",
+      "license": "Apache-2.0",
+      "files": [
+        {
+          "path": "blocks/date-stamp.html",
+          "target": "compositions/date-stamp.html",
+          "type": "hyperframes:composition"
+        }
+      ],
+      "registryDependencies": [],
+      "dimensions": {"width": 1920, "height": 1080},
+      "duration": 5,
+      "variables": [
+        {"id": "durationSeconds", "type": "number", "label": "Seconds on screen, reveal and fade out included", "default": 5, "min": 3, "max": 14, "step": 0.1, "unit": "s"},
+        {"id": "text", "type": "string", "label": "The date", "default": "April 12, 1945", "maxLength": 30},
+        {"id": "position", "type": "enum", "label": "Corner of the frame", "default": "bottom-left", "options": [{"value": "bottom-left", "label": "Bottom left"}, {"value": "top-left", "label": "Top left"}, {"value": "top-right", "label": "Top right"}, {"value": "bottom-right", "label": "Bottom right"}]}
+      ],
+      "source": null,
+      "notes": "Hand-written; the idea follows the date of an earlier prototype, without its per-character typewriter timers and text shadow. The rule draws with scaleX from the left, the date is revealed by a clip-path from the left (the same direction in every corner), the plate behind them is the scrim token at 90% in a soft ellipse around the stamp, so gold stays readable over a white frame. The date starts one micro step after the rule. The timeline fills durationSeconds exactly (the fade out ends at the end); a slot shorter than micro + enter + (read_min + read_per_word x words of the text) + exit throws."
+    },
+    {
+      "name": "graphic-stamp",
+      "type": "hyperframes:block",
+      "title": "Graphic stamp",
+      "description": "A vector graphic (an icon, an arrow, a seal) from an SVG file of the project, over the picture: inline SVG that stays sharp, coloured from a palette token, entering as a stamp, a draw-on of its strokes or a fade, then a hold and a fade out.",
+      "license": "Apache-2.0",
+      "files": [
+        {"path": "blocks/graphic-stamp.html", "target": "compositions/graphic-stamp.html", "type": "hyperframes:composition"}
+      ],
+      "registryDependencies": [],
+      "dimensions": {"width": 1920, "height": 1080},
+      "duration": 4,
+      "variables": [
+        {"id": "durationSeconds", "type": "number", "label": "Seconds on screen, the entrance and the fade out included", "default": 4, "min": 2.4, "max": 30, "step": 0.1, "unit": "s"},
+        {"id": "svg", "type": "string", "label": "The vector: a path to an SVG inside the project, for example assets/media/vectors/arrow.svg (a sample project supplies the default)", "default": "assets/media/vectors/stamp.svg", "maxLength": 200},
+        {"id": "position", "type": "enum", "label": "Where on the frame, inside the safe zone", "default": "top-left", "options": [{"value": "top-left", "label": "Top left"}, {"value": "top-right", "label": "Top right"}, {"value": "bottom-left", "label": "Bottom left"}, {"value": "bottom-right", "label": "Bottom right"}, {"value": "center", "label": "Centre"}]},
+        {"id": "size", "type": "enum", "label": "The square it fits in: small 160 px, medium 280 px, large 440 px", "default": "medium", "options": [{"value": "small", "label": "Small"}, {"value": "medium", "label": "Medium"}, {"value": "large", "label": "Large"}]},
+        {"id": "color", "type": "enum", "label": "Palette colour of what the SVG paints with currentColor", "default": "gold", "options": [{"value": "gold", "label": "Gold"}, {"value": "gold_dim", "label": "Dim gold"}, {"value": "paper", "label": "Paper"}, {"value": "paper_aged", "label": "Aged paper"}, {"value": "ink", "label": "Ink"}, {"value": "oxblood", "label": "Oxblood"}, {"value": "verdigris", "label": "Verdigris"}, {"value": "slate", "label": "Slate"}, {"value": "loss", "label": "Loss"}, {"value": "gain", "label": "Gain"}]},
+        {"id": "animation", "type": "enum", "label": "How it arrives", "default": "stamp", "options": [{"value": "stamp", "label": "Stamp"}, {"value": "draw-on", "label": "Draw on"}, {"value": "fade", "label": "Fade"}]}
+      ],
+      "source": null,
+      "notes": "Hand-written; no code copied. The vector is a file of the project (the hyperframes-edit tools save one under assets/media/vectors after src/hyperframes_mcp/motion/vectors.py check_svg), fetched by its project path and put in the page as inline SVG: that is what lets currentColor take the colour variable and lets a stroke draw itself. No vector is stored in the library: the default path is one a sample project supplies, and the SVG icons of assets/icons are copied into a project by save_vector. Because the file is read at load time the timeline is built and registered once it is in (the async-setup contract); a missing file or one that is not an SVG fails the render quietly, like any thrown error of a mounted block, so add_graphic checks the file first. The file is cleaned again as it is loaded (only drawing elements, no script, style, event attribute or reference outside the file), and its ids are renumbered per mount so two graphics on screen never share a gradient or a clip. All three entrances end at the enter time, so the shortest slot is enter + read_min + exit for each (a static minimum of 2.4 s): a draw-on starts its strokes one micro step apart at most, each drawing with pathLength 1 and a dash offset, and a shape that is only filled is wiped in from the left by a clip-path; a stamp scales a vector down from 1.3 and turns it from -6 degrees onto the frame with the emphasis ease. The picture sits in its square by preserveAspectRatio, against the corner of the safe zone it was placed in."
+    },
+    {
+      "name": "finish",
+      "type": "hyperframes:block",
+      "title": "Finish",
+      "description": "A full-frame transparent overlay of paper dust and fine scratches at low opacity, three tiles stepped at 12 frames a second; adds only what data-color-grading cannot.",
+      "license": "Apache-2.0",
+      "files": [
+        {
+          "path": "blocks/finish.html",
+          "target": "compositions/finish.html",
+          "type": "hyperframes:composition"
+        }
+      ],
+      "registryDependencies": ["finish-textures"],
+      "dimensions": {"width": 1920, "height": 1080},
+      "duration": 10,
+      "variables": [
+        {"id": "durationSeconds", "type": "number", "label": "Seconds on screen, the fade in and the fade out included", "default": 10, "min": 1, "max": 600, "step": 0.5, "unit": "s"},
+        {"id": "dustOpacity", "type": "number", "label": "Strength of the dust and scratches, 0 (none) to 1", "default": 0.35, "min": 0, "max": 1, "step": 0.05}
+      ],
+      "source": null,
+      "notes": "Hand-written. The three tiles in textures/ are derived from two ambientCG maps, Scratches003 and SurfaceImperfections015 (CC0 1.0): the recipe, sizes and licence are in textures/TEXTURES.md and in THIRD_PARTY.md. They are transparent PNGs of light specks and scratches in the paper colour and a few dark specks in the ink colour, about 4% of the frame. The overlay fades in and out over dissolve_min at the ends of its slot, so mount it once over a whole video or act, not per shot. The tiles step at 12 per second with discrete tl.set calls in a fixed hash order (no randomness, never the same tile twice in a row); the dust covers about 4% of the frame, so a step is not a flash. A slot shorter than two dissolve_min throws. The tiles are the component finish-textures, installed with it."
+    },
+    {
+      "name": "finish-textures",
+      "type": "hyperframes:component",
+      "title": "Finish textures",
+      "description": "The three transparent dust and scratch tiles the finish block steps through, 1920 x 1080 RGBA PNG each.",
+      "license": "CC0-1.0",
+      "files": [
+        {
+          "path": "textures/finish-dust-a.png",
+          "target": "assets/textures/finish-dust-a.png",
+          "type": "hyperframes:asset"
+        },
+        {
+          "path": "textures/finish-dust-b.png",
+          "target": "assets/textures/finish-dust-b.png",
+          "type": "hyperframes:asset"
+        },
+        {
+          "path": "textures/finish-dust-c.png",
+          "target": "assets/textures/finish-dust-c.png",
+          "type": "hyperframes:asset"
+        }
+      ],
+      "registryDependencies": [],
+      "variables": [],
+      "source": null,
+      "notes": "Derived from two ambientCG maps, Scratches003 and SurfaceImperfections015 (CC0 1.0), by textures/make_tiles.py: the sources, hashes, recipe and sizes are in textures/TEXTURES.md and in THIRD_PARTY.md. Light specks and scratches are in the paper colour, a few dark specks in the ink colour, about 4% of each tile has any alpha."
+    },
+    {
+      "name": "map-kit",
+      "type": "hyperframes:component",
+      "title": "Map kit",
+      "description": "Natural Earth land, coast, borders, first-level regions, rivers and cities for Germany, Europe and the world, projected and simplified into scripts, and the helpers the map blocks share (projections, camera, label measuring and placement).",
+      "license": "LicenseRef-NaturalEarth-PublicDomain",
+      "files": [
+        {"path": "data/map-germany.js", "target": "data/map-germany.js", "type": "hyperframes:asset"},
+        {"path": "data/map-europe.js", "target": "data/map-europe.js", "type": "hyperframes:asset"},
+        {"path": "data/map-world.js", "target": "data/map-world.js", "type": "hyperframes:asset"},
+        {"path": "js/map-lib.js", "target": "js/map-lib.js", "type": "hyperframes:asset"}
+      ],
+      "registryDependencies": [],
+      "variables": [],
+      "source": {"url": "https://github.com/nvkelso/natural-earth-vector", "sha": "ca96624a56bd078437bca8184e78163e5039ad19"},
+      "notes": "The three data files are built by python -m hyperframes_mcp.motion map-data from Natural Earth GeoJSON (public domain) at the pinned commit, clipped to each region's window, projected (Germany equirectangular scaled by cos 51 degrees, Europe Lambert conformal conic, world Natural Earth), simplified with Douglas-Peucker (0.15, 0.5 and 1.0 map units) and written as a script that registers window.__MOTION_MAPS[region]. The borders are the modern ones. js/map-lib.js is ours (no upstream code); its projections follow Snyder and the published Natural Earth polynomial. See data/DATA.md."
+    },
+    {
+      "name": "map-route",
+      "type": "hyperframes:block",
+      "title": "Map route",
+      "description": "A map shot: land and sea, a camera move from one pose to another, then pins with one pulse ring and a label each, a route drawn on, a date in a corner and a caption. Overlays only move while the camera is held.",
+      "license": "Apache-2.0",
+      "files": [
+        {
+          "path": "blocks/map-route.html",
+          "target": "compositions/map-route.html",
+          "type": "hyperframes:composition"
+        }
+      ],
+      "registryDependencies": ["map-kit"],
+      "dimensions": {"width": 1920, "height": 1080},
+      "duration": 8.6,
+      "coversFrame": true,
+      "slotNotChecked": "its shortest slot is the camera move, the pin and route entrances and the reading time, which depend on the camera poses and the projected route and are only known once the map is drawn; only the static minimum is checked",
+      "variables": [
+        {"id": "durationSeconds", "type": "number", "label": "Seconds on screen, fades and the map move included", "default": 8.6, "min": 3, "max": 30, "step": 0.1, "unit": "s"},
+        {"id": "region", "type": "enum", "label": "Map data", "default": "germany", "options": [{"value": "germany", "label": "Germany and its neighbours"}, {"value": "europe", "label": "Europe"}, {"value": "world", "label": "World"}]},
+        {"id": "pins", "type": "string", "label": "Pins as JSON: [{\"id\":\"berlin\",\"label\":\"Berlin\",\"lon\":13.405,\"lat\":52.52,\"labelSide\":\"right\",\"kind\":\"city\"}]; kind is city, focus, region (a spaced label, no dot) or via (a point of the route, nothing drawn); lon and lat may be left out for a name in the cities table of the region", "default": "[{\"id\":\"berlin\",\"label\":\"Berlin\",\"lon\":13.405,\"lat\":52.52,\"labelSide\":\"right\"},{\"id\":\"leipzig\",\"label\":\"Leipzig\",\"lon\":12.37,\"lat\":51.34,\"labelSide\":\"right\"},{\"id\":\"via1\",\"kind\":\"via\",\"lon\":12.55,\"lat\":52.0},{\"id\":\"via2\",\"kind\":\"via\",\"lon\":11.7,\"lat\":51.45},{\"id\":\"via3\",\"kind\":\"via\",\"lon\":10.95,\"lat\":51.05},{\"id\":\"marburg\",\"label\":\"Marburg\",\"kind\":\"focus\",\"lon\":10.12,\"lat\":50.82,\"labelSide\":\"left\"}]"},
+        {"id": "route", "type": "string", "label": "Pin ids in the order the route runs, as JSON; [] for no route", "default": "[\"berlin\",\"via1\",\"via2\",\"via3\",\"marburg\"]"},
+        {"id": "yearLabel", "type": "string", "label": "A date or year in the corner (may be empty)", "default": "February 11", "maxLength": 40},
+        {"id": "caption", "type": "string", "label": "One line under it (may be empty)", "default": "Berlin to Marburg by rail", "maxLength": 90},
+        {"id": "cameraFrom", "type": "string", "label": "Camera at the start as JSON {lon, lat, span}; span is the visible width in degrees of longitude", "default": "{\"lon\":11.75,\"lat\":51.7,\"span\":9.6}"},
+        {"id": "cameraTo", "type": "string", "label": "Camera when held; equal to cameraFrom locks the camera", "default": "{\"lon\":11.75,\"lat\":51.7,\"span\":8.1}"},
+        {"id": "routeStyle", "type": "enum", "label": "How the route is drawn", "default": "rail", "options": [{"value": "line", "label": "Line"}, {"value": "rail", "label": "Rail"}, {"value": "dots", "label": "Dots"}]},
+        {"id": "borders", "type": "enum", "label": "Borders (the modern ones)", "default": "none", "options": [{"value": "none", "label": "None"}, {"value": "countries", "label": "Countries"}, {"value": "regions", "label": "Countries and first-level regions"}]}
+      ],
+      "source": null,
+      "notes": "Hand-written for the library; shares no code with the HyperFrames catalog. The map move (power2.inOut, 2.0 s plus one second per unit of log zoom and per screen width of pan, at most 4 s) comes first; pins, route, date and caption start after it, staggered at most 0.5 s. The timeline fills durationSeconds exactly; a slot shorter than the move, the entrances, a hold of max(1.2 s, 0.3 s per word) and the fade out throws. Labels are placed from the label font's advance widths: the labelSide hint, then the opposite side, then above or below; no free side throws."
+    },
+    {
+      "name": "split-bar",
+      "type": "hyperframes:block",
+      "title": "Split bar",
+      "description": "One whole bar split into labelled parts on one scale: a faint track for the whole, parts that grow into it from the left by a clip-path wipe in a tone each (gold, paper, ember, mute), a pole and a two-line label for each part above the bar or, when two labels would meet, below it, and brackets under the bar for ranges on the same scale. What the parts leave over stays the faint track, unlabelled.",
+      "license": "Apache-2.0",
+      "files": [
+        {
+          "path": "blocks/split-bar.html",
+          "target": "compositions/split-bar.html",
+          "type": "hyperframes:composition"
+        }
+      ],
+      "registryDependencies": [],
+      "dimensions": {"width": 1920, "height": 1080},
+      "duration": 12,
+      "variables": [
+        {"id": "durationSeconds", "type": "number", "label": "Seconds on screen, growth, reading time and fade out included", "default": 12, "min": 3.3, "max": 40, "step": 0.1, "unit": "s"},
+        {"id": "wholeLabel", "type": "string", "label": "What the whole bar is, above its left end", "default": "The Bundesbank gold ledger", "maxLength": 34},
+        {"id": "wholeValue", "type": "string", "label": "Its size as printed, above its right end", "default": "about 791 tonnes", "maxLength": 24},
+        {"id": "parts", "type": "string", "label": "Parts as JSON, 1 to 6, grown from the left in this order: [{\"label\":\"went abroad\",\"display\":\"about two thirds\",\"value\":503,\"tone\":\"ember\",\"at\":1,\"seconds\":1.2}]. value is the size on the scale of whole; tone is gold, paper, ember or mute; at is the second of the slot when it starts to grow", "default": "[{\"label\":\"found in Germany\",\"display\":\"about a third\",\"value\":236,\"tone\":\"gold\",\"at\":1,\"seconds\":1.2},{\"label\":\"went abroad\",\"display\":\"about two thirds\",\"value\":503,\"tone\":\"ember\",\"at\":2.6,\"seconds\":1.6}]"},
+        {"id": "whole", "type": "number", "label": "The scale: the value of the whole bar. The parts add up to at most this", "default": 791, "step": 1},
+        {"id": "markers", "type": "string", "label": "Brackets under the bar as JSON, up to 3, or [] for none: [{\"label\":\"the Marburg pile\",\"display\":\"about a quarter of the ledger\",\"from\":0,\"to\":210,\"at\":5}]. from and to are on the scale of whole", "default": "[{\"label\":\"the Marburg pile\",\"display\":\"about a quarter of the ledger\",\"from\":0,\"to\":210,\"at\":5}]"},
+        {"id": "note", "type": "string", "label": "A short line under everything, or empty for none", "default": "", "maxLength": 70}
+      ],
+      "source": null,
+      "notes": "Hand-written; no code copied. Part sizes are values on the scale of whole; a part grows at its own time for its own seconds, left to right in order, and its label arrives when it has grown. Label widths come from the advance table of the label face (the widest of its three weights); a label with no free place above or below the bar throws and names the part. The shortest slot is the latest end of a part (at, seconds, the label arriving, the reading time at 1.2 s plus 0.3 s a word, then the exit), of a marker, of the heading and of the note."
+    },
+    {
+      "name": "compare-bars",
+      "type": "hyperframes:block",
+      "title": "Compare bars",
+      "description": "Two to four horizontal bars on one scale, one above the other: each grows from the left to its value by a clip-path wipe in a tone (gold, paper, ember, mute) with its own outline, and carries a two-line label and display, inside the bar when it is long and to the right of it when it is short. A bar of four percent of the largest is still a clearly outlined sliver; the least share drawn is one percent. The only numbers on screen are the texts of the variables.",
+      "license": "Apache-2.0",
+      "files": [
+        {
+          "path": "blocks/compare-bars.html",
+          "target": "compositions/compare-bars.html",
+          "type": "hyperframes:composition"
+        }
+      ],
+      "registryDependencies": [],
+      "dimensions": {"width": 1920, "height": 1080},
+      "duration": 10,
+      "variables": [
+        {"id": "durationSeconds", "type": "number", "label": "Seconds on screen, growth, reading time and fade out included", "default": 10, "min": 3.3, "max": 40, "step": 0.1, "unit": "s"},
+        {"id": "title", "type": "string", "label": "What the bars measure, above them", "default": "Gold, in tonnes", "maxLength": 40},
+        {"id": "bars", "type": "string", "label": "Bars as JSON, 2 to 4, top to bottom: [{\"label\":\"American gold, 1945\",\"display\":\"about 20,000 tonnes\",\"value\":20000,\"tone\":\"paper\",\"at\":1,\"seconds\":1.4}]. value is the length on the scale of scaleMax; tone is gold, paper, ember or mute; at is the second of the slot when it starts to grow", "default": "[{\"label\":\"American gold, 1945\",\"display\":\"about 20,000 tonnes\",\"value\":20000,\"tone\":\"paper\",\"at\":1,\"seconds\":1.4},{\"label\":\"The whole Bundesbank ledger\",\"display\":\"about 791 tonnes\",\"value\":791,\"tone\":\"gold\",\"at\":2.8,\"seconds\":1.2}]"},
+        {"id": "scaleMax", "type": "number", "label": "The scale: the value of a bar the full width. At least the largest value", "default": 20000, "step": 1},
+        {"id": "note", "type": "string", "label": "A short line under the bars, or empty for none", "default": "", "maxLength": 70}
+      ],
+      "source": null,
+      "notes": "Hand-written; no code copied. Bar values are on the scale of scaleMax; a bar grows at its own time for its own seconds (bars may grow together) and its text arrives when it has grown. Text widths come from the advance table of the label face (the widest of its three weights); a text that fits neither inside its bar nor beside it throws and names the bar. The shortest slot is the latest end of a bar (at, seconds, the text arriving, the reading time at 1.2 s plus 0.3 s a word, then the exit), of the title and of the note."
+    }
+  ]
+}

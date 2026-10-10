@@ -1,0 +1,216 @@
+{
+  "result_count": 4812,
+  "page_count": 241,
+  "page_size": 9,
+  "page": 1,
+  "results": [
+    {
+      "id": "0a1b2c3d-1111-4a5b-8c7d-000000000001",
+      "title": "Tetradrachm of Athens, silver coin",
+      "foreign_landing_url": "https://www.metmuseum.org/art/collection/search/245161",
+      "url": "https://images.metmuseum.org/CRDImages/gr/original/DP117421.jpg",
+      "creator": null,
+      "creator_url": null,
+      "license": "cc0",
+      "license_version": "1.0",
+      "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "provider": "met",
+      "source": "met",
+      "category": "digitized_artwork",
+      "filesize": 2845113,
+      "filetype": "jpg",
+      "tags": [
+        {
+          "name": "coin"
+        },
+        {
+          "name": "silver"
+        },
+        {
+          "name": "athens"
+        }
+      ],
+      "attribution": "\"Tetradrachm of Athens, silver coin\" is marked with CC0 1.0.",
+      "mature": false,
+      "height": 2000,
+      "width": 3000
+    },
+    {
+      "id": "0a1b2c3d-1111-4a5b-8c7d-000000000002",
+      "title": "Wall Street, 1929",
+      "foreign_landing_url": "https://www.flickr.com/photos/nypl/5328123",
+      "url": "https://live.staticflickr.com/5/5328123_o.jpg",
+      "creator": "The New York Public Library",
+      "creator_url": "https://www.flickr.com/photos/nypl",
+      "license": "pdm",
+      "license_version": "1.0",
+      "license_url": "https://creativecommons.org/publicdomain/mark/1.0/",
+      "provider": "flickr",
+      "source": "flickr",
+      "category": "photograph",
+      "filesize": 1204331,
+      "filetype": "jpg",
+      "tags": [
+        {
+          "name": "wall street"
+        },
+        {
+          "name": "crowd"
+        }
+      ],
+      "attribution": "\"Wall Street, 1929\" by The New York Public Library is marked with Public Domain Mark 1.0.",
+      "mature": false,
+      "height": 1400,
+      "width": 2100
+    },
+    {
+      "id": "4c0ec6db-54ac-4aa1-9102-05689457d8de",
+      "title": "Latrobes 31Aug2015 Bank Vault Door 2",
+      "indexed_on": "2020-03-01T15:43:05.095823Z",
+      "foreign_landing_url": "https://www.flickr.com/photos/29350288@N06/20606643344",
+      "url": "https://live.staticflickr.com/5649/20606643344_c44de65fc0_b.jpg",
+      "creator": "Infrogmation",
+      "creator_url": "https://www.flickr.com/photos/29350288@N06",
+      "license": "by",
+      "license_version": "2.0",
+      "license_url": "https://creativecommons.org/licenses/by/2.0/",
+      "provider": "flickr",
+      "source": "flickr",
+      "category": null,
+      "filesize": null,
+      "filetype": null,
+      "tags": [
+        {
+          "name": "frenchquarter",
+          "accuracy": null,
+          "unstable__provider": "flickr"
+        },
+        {
+          "name": "neworleans",
+          "accuracy": null,
+          "unstable__provider": "flickr"
+        },
+        {
+          "name": "adult",
+          "accuracy": 0.96436,
+          "unstable__provider": "clarifai"
+        },
+        {
+          "name": "art",
+          "accuracy": 0.90569,
+          "unstable__provider": "clarifai"
+        },
+        {
+          "name": "container",
+          "accuracy": 0.94442,
+          "unstable__provider": "clarifai"
+        },
+        {
+          "name": "doorway",
+          "accuracy": 0.91356,
+          "unstable__provider": "clarifai"
+        }
+      ],
+      "attribution": "\"Latrobes 31Aug2015 Bank Vault Door 2\" by Infrogmation is licensed under CC BY 2.0. To view a copy of this license, visit https://creativecommons.org/licenses/by/2.0/.",
+      "fields_matched": [
+        "description",
+        "title"
+      ],
+      "mature": false,
+      "height": 1024,
+      "width": 768,
+      "thumbnail": "https://api.openverse.org/v1/images/4c0ec6db-54ac-4aa1-9102-05689457d8de/thumb/",
+      "detail_url": "https://api.openverse.org/v1/images/4c0ec6db-54ac-4aa1-9102-05689457d8de/",
+      "related_url": "https://api.openverse.org/v1/images/4c0ec6db-54ac-4aa1-9102-05689457d8de/related/",
+      "unstable__sensitivity": []
+    },
+    {
+      "id": "0a1b2c3d-1111-4a5b-8c7d-000000000004",
+      "title": "Vault, no author given",
+      "foreign_landing_url": "https://www.flickr.com/photos/x/99002",
+      "url": "https://live.staticflickr.com/9/99002_o.jpg",
+      "creator": null,
+      "creator_url": null,
+      "license": "by",
+      "license_version": "4.0",
+      "license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "provider": "flickr",
+      "source": "flickr",
+      "category": "photograph",
+      "filesize": 900000,
+      "filetype": "jpg",
+      "tags": [],
+      "mature": false,
+      "height": 1200,
+      "width": 1800
+    },
+    {
+      "id": "0a1b2c3d-1111-4a5b-8c7d-000000000005",
+      "title": "A picture on a plain-http host",
+      "foreign_landing_url": "https://example.org/pictures/5",
+      "url": "http://example.org/pictures/5.jpg",
+      "creator": "A. Person",
+      "license": "cc0",
+      "license_version": "1.0",
+      "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "provider": "example",
+      "source": "example",
+      "tags": [],
+      "height": 1000,
+      "width": 1500
+    },
+    {
+      "id": "0a1b2c3d-1111-4a5b-8c7d-000000000006",
+      "title": "Size not stated",
+      "foreign_landing_url": "https://example.org/pictures/6",
+      "url": "https://example.org/pictures/6.jpg",
+      "creator": "A. Person",
+      "license": "cc0",
+      "license_version": "1.0",
+      "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "provider": "example",
+      "source": "example",
+      "tags": null,
+      "height": null,
+      "width": null
+    },
+    {
+      "id": "0a1b2c3d-1111-4a5b-8c7d-000000000007",
+      "title": "Share-alike picture",
+      "foreign_landing_url": "https://example.org/pictures/7",
+      "url": "https://example.org/pictures/7.jpg",
+      "creator": "A. Person",
+      "license": "by-sa",
+      "license_version": "4.0",
+      "license_url": "https://creativecommons.org/licenses/by-sa/4.0/",
+      "provider": "example",
+      "source": "example",
+      "tags": [],
+      "height": 1000,
+      "width": 1500
+    },
+    {
+      "id": "0a1b2c3d-1111-4a5b-8c7d-000000000008",
+      "title": "Licence and deed disagree",
+      "foreign_landing_url": "https://example.org/pictures/8",
+      "url": "https://example.org/pictures/8.jpg",
+      "creator": "A. Person",
+      "license": "cc0",
+      "license_version": "1.0",
+      "license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "provider": "example",
+      "source": "example",
+      "tags": [],
+      "height": 1000,
+      "width": 1500
+    },
+    {
+      "title": "An item with no id",
+      "foreign_landing_url": "https://example.org/pictures/9",
+      "url": "https://example.org/pictures/9.jpg",
+      "license": "cc0",
+      "license_version": "1.0",
+      "license_url": "https://creativecommons.org/publicdomain/zero/1.0/"
+    }
+  ]
+}

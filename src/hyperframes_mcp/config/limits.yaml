@@ -1,0 +1,31 @@
+# Spending limits of the server, enforced in code. A paid call (a picture or a clip) is quoted first and then
+# confirmed; above a limit it is refused until the number here is raised. To change a value, copy this file to
+# ~/.hyperframes-mcp/config/limits.yaml and edit the copy (a file there replaces this one).
+#
+# Dollars (they trust the price table):
+#   per_call_usd       the most one call may cost
+#   per_project_usd    the most one video (one project folder) may spend in all
+#   per_day_usd        the most one video may spend in a UTC day; empty: no limit
+#   all_projects_per_day_usd  the most every project together may spend in a UTC day, counted from the central log
+#                      (~/.hyperframes-mcp/data/spend.jsonl); empty: no limit
+# Calls (they trust nothing, so a wrong price cannot run away):
+#   max_calls_per_hour paid calls of every project in the last hour; empty: no limit
+#   max_calls_per_day  paid calls of every project in a UTC day; empty: no limit
+# Other:
+#   quote_ttl_seconds  how long a quote may be confirmed after it was made
+#   max_tries_per_quote how often one quote may be confirmed when the call was refused before it was sent
+#   profiles           limits that replace these for one profile: profiles: {<name>: {per_project_usd: 6}}
+#
+# A variable in the environment of the server can only LOWER a limit (or set one left empty), never raise it:
+#   HYPERFRAMES_MCP_PER_CALL_USD, _PER_PROJECT_USD, _PER_DAY_USD, _ALL_PROJECTS_PER_DAY_USD,
+#   _MAX_CALLS_PER_HOUR, _MAX_CALLS_PER_DAY      (set them with `hyperframes-mcp register --env NAME=VALUE`)
+# HYPERFRAMES_MCP_SPEND=off, or `hyperframes-mcp spend freeze`, refuses every paid call.
+spend:
+  per_call_usd: 1.0
+  per_project_usd: 10.0
+  per_day_usd:
+  all_projects_per_day_usd: 10.0
+  max_calls_per_hour: 30
+  max_calls_per_day: 100
+  quote_ttl_seconds: 900
+  max_tries_per_quote: 2

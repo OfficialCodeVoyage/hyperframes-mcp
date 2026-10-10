@@ -1,0 +1,775 @@
+<!--
+  Copyright 2026 the hyperframes-mcp contributors. Hand-written for the motion library (src/hyperframes_mcp/motion), to the component
+  contract in docs/motion-library.md. The idea is the pictogram: a count too large to feel as a
+  number (8,198 gold bars) is drawn as one small bar glyph per bar, and a part of it (320 of 8,198) is seen against
+  the whole. No code is copied.
+
+  A transparent block: a soft dark band behind the content (title, the grid, one legend row per segment, a note) and
+  nothing else. The grid is two canvases of one glyph per cell: the empty cells are drawn once, and the lit cells are
+  redrawn from the time alone by a modifier on one linear ticker (a GSAP modifier runs on every render of the tween,
+  not as a callback, so a seek that jumps, goes back or is a quiet seek before the real one draws the same frame; the
+  counter block does the same for its digits). Segments fill in order from the top left, row by row, as a wave: each
+  cell lights, flashes toward paper and settles into its tone over a short trail. The legend count of a segment is
+  the number of its cells lit so far, so the figure and the picture agree at every frame. When a segment is full an
+  outline of its cells pulses once and stays as a faint frame, so a small segment is seen. The arithmetic (the
+  segments and their refusals, the slot minimum, the layout, which cell is lit at a time) is between the logic
+  markers: tests/motion/test_bar_grid.py runs it in Node and the composer's preflight runs minSlot. Every colour,
+  size, duration and ease comes from tokens.css.
+-->
+<!doctype html>
+<html
+  lang="en"
+  data-composition-variables='[
+    {"id":"durationSeconds","type":"number","label":"Seconds on screen, entrance and fade out included","default":8,"min":4,"max":40,"step":0.1,"unit":"s"},
+    {"id":"title","type":"string","label":"What the grid is, at most 70 characters","default":"Marburg: gold bars in the first partial count","maxLength":70},
+    {"id":"total","type":"number","label":"Number of cells in the grid, 1 to 20000: one glyph per bar","default":8198,"min":1,"max":20000,"step":1},
+    {"id":"segments","type":"string","label":"Segments as JSON, at most 5, filled in order from the top left: [{\"count\":8198,\"label\":\"found in the partial count\",\"tone\":\"gold\",\"at\":0.4,\"seconds\":3}]; tone is gold, paper, ember or mute; at is the second of the slot when the fill starts; label at most 38 characters","default":"[{\"count\":8198,\"label\":\"found in the partial count\",\"tone\":\"gold\",\"at\":0.4,\"seconds\":3}]"},
+    {"id":"unit","type":"string","label":"What one cell is, after each count; may be empty","default":"bars","maxLength":16},
+    {"id":"note","type":"string","label":"Small line under the legend; may be empty","default":"","maxLength":66}
+  ]'
+>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <title>Bar grid</title>
+    <link rel="stylesheet" href="tokens.css" />
+    <script src="vendor/gsap.min.js"></script>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { width: 1920px; height: 1080px; overflow: hidden; background: transparent; }
+      #bar-grid-root { position: relative; width: 1920px; height: 1080px; overflow: hidden; }
+      #bar-grid-root .stage { position: absolute; left: 0; top: 0; width: 100%; height: 100%; }
+      /* A band behind the content, soft at its top and bottom edge: the grid and the text read on any shot. */
+      #bar-grid-root .scrim {
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: calc(var(--stack-top) - var(--fade));
+        height: calc(var(--stack-h) + 2 * var(--fade));
+        background: linear-gradient(
+          to bottom,
+          transparent 0,
+          color-mix(in srgb, var(--color-scrim) 12%, transparent) calc(var(--fade) * 0.27),
+          color-mix(in srgb, var(--color-scrim) 40%, transparent) calc(var(--fade) * 0.5),
+          color-mix(in srgb, var(--color-scrim) 72%, transparent) calc(var(--fade) * 0.73),
+          color-mix(in srgb, var(--color-scrim) 88%, transparent) var(--fade),
+          color-mix(in srgb, var(--color-scrim) 88%, transparent) calc(100% - var(--fade)),
+          color-mix(in srgb, var(--color-scrim) 72%, transparent) calc(100% - var(--fade) * 0.73),
+          color-mix(in srgb, var(--color-scrim) 40%, transparent) calc(100% - var(--fade) * 0.5),
+          color-mix(in srgb, var(--color-scrim) 12%, transparent) calc(100% - var(--fade) * 0.27),
+          transparent 100%
+        );
+        opacity: 0;
+      }
+      #bar-grid-root .stack {
+        position: absolute;
+        left: var(--safe-left);
+        right: var(--safe-right);
+        top: var(--stack-top);
+        height: var(--stack-h);
+        display: flex;
+        flex-direction: column;
+        gap: var(--gap);
+      }
+      #bar-grid-root .title {
+        flex: 0 0 var(--title-h);
+        font-family: var(--font-display);
+        font-weight: 600;
+        font-size: var(--size-subtitle);
+        line-height: var(--title-line);
+        text-wrap: balance;
+        color: var(--color-paper);
+        opacity: 0;
+      }
+      #bar-grid-root .grid { position: relative; flex: 0 0 var(--grid-h); opacity: 0; }
+      /* The canvases are the grid plus a margin all round, where the pulse ring of a segment can spread. */
+      #bar-grid-root .cells {
+        position: absolute;
+        left: calc(var(--margin) * -1);
+        top: calc(var(--margin) * -1);
+      }
+      #bar-grid-root .legend { flex: none; display: flex; flex-direction: column; }
+      #bar-grid-root .chip {
+        flex: 0 0 var(--row-h);
+        display: grid;
+        grid-template-columns: var(--swatch-w) var(--count-w) var(--unit-w) 1fr;
+        column-gap: var(--col-gap);
+        align-items: baseline;
+        opacity: 0;
+      }
+      #bar-grid-root .swatch {
+        align-self: center;
+        width: var(--swatch-w);
+        height: var(--swatch-h);
+        background: var(--tone);
+        clip-path: polygon(14% 0, 86% 0, 100% 100%, 0 100%);
+      }
+      #bar-grid-root .count {
+        font-family: var(--font-display);
+        font-weight: 500;
+        font-size: var(--count-size);
+        line-height: 1;
+        text-align: right;
+        white-space: nowrap;
+        color: var(--tone);
+        font-variant-numeric: tabular-nums;
+        font-feature-settings: "tnum" 1;
+      }
+      #bar-grid-root .unit,
+      #bar-grid-root .label,
+      #bar-grid-root .note {
+        font-family: var(--font-label);
+        font-weight: 500;
+        font-size: var(--size-min-text);
+        line-height: 1;
+        white-space: nowrap;
+      }
+      #bar-grid-root .unit { color: var(--color-paper-aged); }
+      #bar-grid-root .label { color: var(--color-paper); }
+      #bar-grid-root .note { flex: 0 0 var(--note-line); line-height: var(--note-line); color: var(--color-paper-aged); opacity: 0; }
+    </style>
+  </head>
+  <body>
+    <div id="bar-grid-root" data-composition-id="bar-grid" data-width="1920" data-height="1080" data-start="0" data-duration="8">
+      <div class="stage">
+        <div class="scrim"></div>
+        <div class="stack">
+          <h2 class="title"></h2>
+          <div class="grid">
+            <canvas class="cells cells-empty"></canvas>
+            <canvas class="cells cells-lit" data-linear-ok></canvas>
+          </div>
+          <div class="legend"></div>
+          <p class="note"></p>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      (function () {
+        "use strict";
+
+        // logic:begin
+        // The arithmetic of the block, with no DOM in it: tests/motion/test_bar_grid.py runs these functions in Node, and
+        // the composer's preflight (src/hyperframes_mcp/motion/preflight.py) runs minSlot. Times are seconds into the slot.
+
+        var MAX_SEGMENTS = 5;
+        var MAX_TITLE = 70; // the same numbers as maxLength above, which a test compares
+        var MAX_LABEL = 38;
+        var MAX_UNIT = 16;
+        var MAX_NOTE = 66;
+        var MAX_TOTAL = 20000;
+        // A tone is a colour of the tokens: ember is the lifted oxblood of the meaning colours, mute is paper_aged.
+        var TONE_TOKEN = { gold: "--color-gold", paper: "--color-paper", ember: "--color-loss", mute: "--color-paper-aged" };
+
+        // The look of a lit cell, level 1 to 8: [alpha of the tone, alpha of the paper tint over it]. A cell comes up in
+        // its tone, flashes toward paper at level 4 and settles at level 8 over the trail. Level 0 is an empty cell (the
+        // faint glyph drawn once under the lit ones).
+        var LOOK = [null, [0.3, 0.25], [0.5, 0.5], [0.75, 0.8], [1, 1], [1, 0.7], [1, 0.45], [1, 0.2], [1, 0]];
+        var LEVELS = LOOK.length - 1;
+        var EMPTY_ALPHA = 0.16;
+        var TOP_FACE_ALPHA = 0.22; // the lighter top face of a bar, over the top rows of the glyph
+        var TRAIL = 0.5; // seconds from a cell's first light to its tone (at most half the segment's time)
+        var WASH_ALPHA = 0.16; // the tint under a full segment, which stays: a small segment is one band, not scattered cells
+        var RESTING_ALPHA = 0.9; // the frame round a full segment, which stays
+        var OUTLINE_PX = 2;
+        var RING_PX = 16; // how far the pulse ring spreads, over the entrance time
+        var RING_ALPHA = 0.9;
+        var MARGIN = 20; // px of canvas round the grid, for the ring (at least RING_PX plus its line)
+        var SETTLE_EPS = 1e-6; // so the rounding of t - end cannot leave a ring a hair short of finished at settledAt
+
+        // Layout, in whole pixels. A cell is ASPECT times as wide as it is tall (a bar lies down).
+        var GAP = 24;
+        var GRID_MAX_H = 640;
+        var GRID_MIN_H = 160;
+        var ASPECT = 1.5;
+        var PITCH_MAX = 32;
+        var PITCH_MIN = 3;
+        var TITLE_LEADING = 1.15;
+        var ROW_LEADING = 1.15;
+        var NOTE_LEADING = 1.25;
+        var SWATCH_EM = 0.45;
+        var COL_GAP = 16;
+        var UNIT_GAP = 12;
+        var FADE = 96; // the soft edge of the band, px
+
+        // Advance widths in thousandths of an em for the characters 32 (space) to 126 (~), read from the font files:
+        // the title is Newsreader at weight 600 and optical size 64, the labels IBM Plex Sans Condensed Medium. A test
+        // checks them. Kerning is ignored (it only tightens a line); a character outside the table counts as wide.
+        var DISPLAY_ADV = [
+          220, 281, 382, 635, 635, 820, 772, 198, 282, 282, 402, 564, 252, 334, 250, 391, 635, 635, 635, 635,
+          635, 635, 635, 635, 635, 635, 279, 284, 564, 564, 564, 491, 902, 762, 706, 718, 796, 701, 640, 782,
+          859, 384, 452, 806, 652, 1058, 783, 811, 678, 812, 742, 592, 744, 802, 748, 1066, 769, 737, 684, 302,
+          390, 302, 564, 410, 500, 532, 600, 489, 612, 506, 394, 534, 614, 304, 286, 601, 298, 910, 622, 576,
+          612, 598, 452, 436, 404, 602, 583, 824, 572, 574, 498, 297, 217, 297, 564,
+        ];
+        var LABEL_ADV = [
+          212, 272, 411, 605, 537, 857, 637, 230, 303, 303, 475, 540, 263, 360, 264, 380, 540, 540, 540, 540,
+          540, 540, 540, 540, 540, 540, 278, 278, 540, 540, 540, 440, 808, 596, 595, 573, 617, 536, 515, 635,
+          644, 377, 481, 598, 465, 735, 645, 640, 568, 640, 592, 538, 521, 619, 570, 840, 578, 553, 534, 293,
+          380, 293, 540, 505, 540, 497, 535, 460, 535, 501, 314, 486, 525, 244, 245, 497, 260, 796, 525, 506,
+          535, 535, 347, 446, 328, 525, 464, 723, 477, 470, 440, 322, 323, 322, 540,
+        ];
+        var ADVANCE_UNKNOWN = 900;
+        var ADVANCE_MARGIN = 1.04;
+        // The digits of the count figure: Newsreader at weight 500 and the largest optical size, as the counter block.
+        var DIGIT_EM = 0.63;
+        var COMMA_EM = 0.25;
+
+        function wordCount(text) {
+          return text.split(/\s+/).filter(Boolean).length;
+        }
+
+        function formatThousands(n) {
+          return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+        }
+
+        function measure(text, table, px) {
+          var thousandths = 0;
+          for (var i = 0; i < text.length; i += 1) {
+            var code = text.charCodeAt(i);
+            thousandths += code >= 32 && code <= 126 ? table[code - 32] : ADVANCE_UNKNOWN;
+          }
+          return (thousandths / 1000) * px * ADVANCE_MARGIN;
+        }
+
+        // No literal fallbacks: a missing or wrong variable fails the render rather than drawing a wrong frame.
+        function needText(V, name, max, allowEmpty) {
+          if (typeof V[name] !== "string") throw new Error("bar-grid: the " + name + " variable is missing or is not text");
+          var text = V[name].trim();
+          if (!allowEmpty && text === "") throw new Error("bar-grid: the " + name + " variable is empty");
+          if (text.length > max) throw new Error("bar-grid: the " + name + " is " + text.length + " characters; at most " + max);
+          return text;
+        }
+
+        // The segments variable: JSON text (a list passed by the host is used as it is), checked one by one.
+        function parseSegments(raw, total) {
+          var list = raw;
+          if (raw === undefined) throw new Error("bar-grid: the segments variable is missing");
+          if (typeof raw === "string") {
+            try {
+              list = JSON.parse(raw);
+            } catch (error) {
+              throw new Error("bar-grid: the segments variable is not valid JSON (" + error.message + ")");
+            }
+          }
+          if (!Array.isArray(list) || list.length === 0) {
+            throw new Error("bar-grid: the segments variable must be a list with at least one segment");
+          }
+          if (list.length > MAX_SEGMENTS) {
+            throw new Error("bar-grid: the segments variable lists " + list.length + " segments; at most " + MAX_SEGMENTS + " fit under the grid");
+          }
+          var first = 0;
+          var segments = list.map(function (s, i) {
+            var at = "segments[" + i + "]";
+            if (!s || typeof s !== "object" || Array.isArray(s)) {
+              throw new Error("bar-grid: " + at + " must be an object with count, label, tone, at and seconds");
+            }
+            if (!Number.isInteger(s.count) || s.count < 1) {
+              throw new Error("bar-grid: " + at + ".count must be a whole number of at least 1");
+            }
+            if (typeof s.label !== "string" || s.label.trim() === "") {
+              throw new Error("bar-grid: " + at + ".label is missing or empty");
+            }
+            var label = s.label.trim();
+            if (label.length > MAX_LABEL) {
+              throw new Error("bar-grid: " + at + ".label is " + label.length + " characters; at most " + MAX_LABEL);
+            }
+            if (Object.keys(TONE_TOKEN).indexOf(s.tone) < 0) {
+              throw new Error("bar-grid: " + at + '.tone "' + s.tone + '" is not one of ' + Object.keys(TONE_TOKEN).join(", "));
+            }
+            if (!Number.isFinite(s.at) || s.at < 0) {
+              throw new Error("bar-grid: " + at + ".at must be a number of seconds, 0 or more");
+            }
+            if (!Number.isFinite(s.seconds) || s.seconds <= 0) {
+              throw new Error("bar-grid: " + at + ".seconds must be a number of seconds, more than 0");
+            }
+            var trail = Math.min(TRAIL, s.seconds / 2);
+            var seg = { first: first, count: s.count, label: label, tone: s.tone, at: s.at, seconds: s.seconds, trail: trail, sweep: s.seconds - trail };
+            first += s.count;
+            return seg;
+          });
+          if (first > total) {
+            throw new Error("bar-grid: the segment counts add up to " + first + ", more than the total of " + total + " cells");
+          }
+          segments.forEach(function (seg, i) {
+            if (i > 0 && seg.at < segments[i - 1].at) {
+              throw new Error("bar-grid: segments[" + i + "].at is before segments[" + (i - 1) + "].at: segments fill in order");
+            }
+          });
+          return segments;
+        }
+
+        // What the page and the composer's preflight read from the variables: the checked content.
+        function readConfig(V) {
+          var total = V.total;
+          if (!Number.isInteger(total) || total < 1 || total > MAX_TOTAL) {
+            throw new Error("bar-grid: the total variable is missing or is not a whole number from 1 to " + MAX_TOTAL);
+          }
+          return {
+            title: needText(V, "title", MAX_TITLE, false),
+            total: total,
+            unit: needText(V, "unit", MAX_UNIT, true),
+            note: needText(V, "note", MAX_NOTE, true),
+            segments: parseSegments(V.segments, total),
+          };
+        }
+
+        // The times the slot has to hold, from the tokens (tok(name) is the number of a token custom property).
+        function timingInput(tok) {
+          return {
+            enter: tok("--dur-enter"),
+            exit: tok("--dur-exit"),
+            readMin: tok("--dur-read-min"),
+            readPerWord: tok("--dur-read-per-word"),
+          };
+        }
+
+        // The shortest slot: the segment that is full last (the later of two that end together) is full at its at plus its
+        // seconds, its outline pulses for the entrance time, its label holds for the reading time (read_min plus
+        // read_per_word a word), then the exit.
+        function neededOf(segments, p) {
+          var last = segments.reduce(function (best, seg) {
+            return seg.at + seg.seconds >= best.at + best.seconds ? seg : best;
+          });
+          return last.at + last.seconds + p.enter + p.readMin + p.readPerWord * wordCount(last.label) + p.exit;
+        }
+
+        function minSlot(V, tok) {
+          return neededOf(readConfig(V).segments, timingInput(tok));
+        }
+
+        // A slot that cannot hold the fills and the reading time is an error that says which.
+        function checkSlot(segments, p) {
+          segments.forEach(function (seg, i) {
+            if (!(seg.at + seg.seconds <= p.duration + 1e-6)) {
+              throw new Error(
+                "bar-grid: segments[" + i + "] ends at " + (seg.at + seg.seconds).toFixed(2) + " s (at " + seg.at +
+                  " plus seconds " + seg.seconds + "), after the slot of durationSeconds " + p.duration + " s",
+              );
+            }
+          });
+          var needed = neededOf(segments, p);
+          if (!Number.isFinite(p.duration) || !(p.duration + 1e-6 >= needed)) {
+            throw new Error(
+              "bar-grid: durationSeconds " + p.duration + " is shorter than the " + needed.toFixed(2) +
+                " s it needs (the last segment is full, then the outline pulse, the reading time of its label and the fade out)",
+            );
+          }
+        }
+
+        // ---- layout ---------------------------------------------------------------------------------------------------
+
+        // The biggest cells (a whole pixel pitch, ASPECT wide for one tall) whose rows fit the height; the columns are
+        // then trimmed so the last row is nearly full.
+        function chooseGrid(total, width, maxHeight) {
+          for (var py = PITCH_MAX; py >= PITCH_MIN; py -= 1) {
+            var px = Math.round(py * ASPECT);
+            var rows = Math.ceil(total / Math.floor(width / px));
+            if (rows * py <= maxHeight) {
+              var cols = Math.ceil(total / rows);
+              return { px: px, py: py, cols: cols, rows: rows, width: cols * px, height: rows * py };
+            }
+          }
+          throw new Error("bar-grid: " + total + " cells do not fit a grid " + width + " px wide and " + maxHeight + " px tall");
+        }
+
+        // One bar: a trapezoid, narrower at the top, drawn row by row so the edge is crisp. insets[r] is the number of
+        // pixels cut from each side of row r.
+        function glyphOf(px, py) {
+          var gap = Math.max(1, Math.round(py * 0.2));
+          var w = px - gap;
+          var h = py - gap;
+          var maxInset = h >= 4 ? Math.max(1, Math.floor(w * 0.17)) : 0;
+          var insets = [];
+          for (var r = 0; r < h; r += 1) insets.push(h > 1 ? Math.round((maxInset * (h - 1 - r)) / (h - 1)) : 0);
+          return { w: w, h: h, insets: insets, ox: Math.floor(gap / 2), oy: Math.floor(gap / 2), topRows: h >= 6 ? 2 : h >= 4 ? 1 : 0 };
+        }
+
+        // The page's geometry from the content (cfg, as readConfig gives it) and env: the type sizes (title, subtitle, body,
+        // minText) and the safe zone. A label that does not fit its column, a note wider than one line and a grid that does
+        // not fit are errors.
+        function layoutFor(cfg, env) {
+          var s = env.sizes;
+          var count = cfg.segments.length;
+          var titleLines = measure(cfg.title, DISPLAY_ADV, s.subtitle) > env.safeW ? 2 : 1;
+          var titleLine = Math.round(s.subtitle * TITLE_LEADING);
+          var countSize = count === 1 ? s.title : s.body; // one segment is the whole story: its count is the big figure
+          var rowH = Math.round(countSize * ROW_LEADING);
+          var swatchH = Math.round(countSize * SWATCH_EM); // a bar's silhouette, as tall as the figure's digits are
+          var swatchW = Math.round(swatchH * ASPECT);
+          var noteLine = Math.round(s.minText * NOTE_LEADING);
+          var fixedH = titleLines * titleLine + 2 * GAP + count * rowH + (cfg.note ? GAP + noteLine : 0);
+          var maxGridH = Math.min(GRID_MAX_H, env.safeH - fixedH);
+          if (maxGridH < GRID_MIN_H) {
+            throw new Error("bar-grid: the title, legend and note leave " + maxGridH + " px for the grid; at least " + GRID_MIN_H + " are needed");
+          }
+          var grid = chooseGrid(cfg.total, env.safeW, maxGridH);
+          var widest = Math.max.apply(null, cfg.segments.map(function (seg) { return seg.count; }));
+          var digits = String(widest).length;
+          var countW = Math.ceil((digits * DIGIT_EM + Math.floor((digits - 1) / 3) * COMMA_EM) * countSize);
+          var unitW = cfg.unit ? Math.ceil(measure(cfg.unit, LABEL_ADV, s.minText)) + UNIT_GAP : 0;
+          var labelW = env.safeW - swatchW - countW - unitW - 3 * COL_GAP;
+          cfg.segments.forEach(function (seg, i) {
+            var width = measure(seg.label, LABEL_ADV, s.minText);
+            if (width > labelW) {
+              throw new Error(
+                "bar-grid: segments[" + i + '].label "' + seg.label + '" is about ' + Math.round(width) + " px wide; the legend has " + labelW + " px for it",
+              );
+            }
+          });
+          if (cfg.note && measure(cfg.note, LABEL_ADV, s.minText) > env.safeW) throw new Error("bar-grid: the note is too wide for one line");
+          var stackH = fixedH + grid.height;
+          return {
+            titleH: titleLines * titleLine, titleLine: titleLine,
+            grid: grid, glyph: glyphOf(grid.px, grid.py),
+            countSize: countSize, rowH: rowH, swatchW: swatchW, swatchH: swatchH, noteLine: noteLine,
+            countW: countW, unitW: unitW,
+            stackH: stackH, stackTop: env.safeTop + Math.floor((env.safeH - stackH) / 2),
+            canvasW: grid.width + 2 * MARGIN, canvasH: grid.height + 2 * MARGIN,
+          };
+        }
+
+        // ---- which cell is lit when --------------------------------------------------------------------------------
+
+        // The cells of a segment that have started to light at time t: its k-th cell starts at at + sweep * k / count,
+        // so the last starts before the sweep ends and every cell has settled by at + seconds.
+        function startedCells(seg, t) {
+          if (!(t >= seg.at)) return 0;
+          var n = Math.floor(((t - seg.at) * seg.count) / seg.sweep) + 1;
+          return n > seg.count ? seg.count : n;
+        }
+
+        // The level of the k-th cell of a segment at time t: 0 before it starts, 1 to LEVELS - 1 over the trail, LEVELS
+        // from then on.
+        function levelAt(seg, k, t) {
+          var u = t - (seg.at + (seg.sweep * k) / seg.count);
+          if (!(u >= 0)) return 0;
+          return u >= seg.trail ? LEVELS : 1 + Math.floor((u / seg.trail) * (LEVELS - 1));
+        }
+
+        // The cells of a segment form whole rows with a partial first and last row; its outline is that shape, clockwise
+        // on the screen, in cell units: two rectangles when the last row ends before the first begins, else one polygon.
+        function outlineShapes(first, count, cols) {
+          var last = first + count - 1;
+          var r0 = Math.floor(first / cols);
+          var c0 = first % cols;
+          var r1 = Math.floor(last / cols);
+          var c1 = (last % cols) + 1;
+          var shapes;
+          if (r0 === r1) {
+            shapes = [[[c0, r0], [c1, r0], [c1, r0 + 1], [c0, r0 + 1]]];
+          } else if (r1 === r0 + 1 && c1 < c0) {
+            shapes = [[[c0, r0], [cols, r0], [cols, r1], [c0, r1]], [[0, r1], [c1, r1], [c1, r1 + 1], [0, r1 + 1]]];
+          } else {
+            shapes = [[[c0, r0], [cols, r0], [cols, r1], [c1, r1], [c1, r1 + 1], [0, r1 + 1], [0, r0 + 1], [c0, r0 + 1]]];
+          }
+          return shapes.map(function (points) {
+            // points that lie on a straight line between their neighbours, or repeat one, are dropped
+            var kept = points.filter(function (pt, i) {
+              var before = points[(i + points.length - 1) % points.length];
+              var after = points[(i + 1) % points.length];
+              var repeats = (before[0] === pt[0] && before[1] === pt[1]) || (after[0] === pt[0] && after[1] === pt[1]);
+              var straight = (pt[0] - before[0]) * (after[1] - pt[1]) === (pt[1] - before[1]) * (after[0] - pt[0]);
+              return !repeats && !straight;
+            });
+            return kept.length >= 3 ? kept : points;
+          });
+        }
+
+        // The polygon in pixels, moved outward by d px: every edge of a clockwise polygon of axis-aligned edges moves along
+        // its outward normal, so a vertex moves by the sum of the two normals at it.
+        function inflated(points, m, d) {
+          return points.map(function (pt, i) {
+            var before = points[(i + points.length - 1) % points.length];
+            var after = points[(i + 1) % points.length];
+            var inX = Math.sign(pt[0] - before[0]);
+            var inY = Math.sign(pt[1] - before[1]);
+            var outX = Math.sign(after[0] - pt[0]);
+            var outY = Math.sign(after[1] - pt[1]);
+            return [MARGIN + pt[0] * m.px + d * (inY + outY), MARGIN + pt[1] * m.py - d * (inX + outX)];
+          });
+        }
+
+        // The top left pixel of the glyph of the i-th cell (cells run along the rows, from the top left).
+        function cellLeft(m, i) {
+          return MARGIN + (i % m.cols) * m.px + m.ox;
+        }
+        function cellTop(m, i) {
+          return MARGIN + Math.floor(i / m.cols) * m.py + m.oy;
+        }
+
+        // The empty cells: one faint glyph for each of the `total` cells, drawn once.
+        function drawEmptyCells(ctx, m, image, total) {
+          for (var i = 0; i < total; i += 1) ctx.drawImage(image, cellLeft(m, i), cellTop(m, i));
+        }
+
+        // The outline of the s-th segment, moved out by d px, painted with ctx.fill or ctx.stroke (method).
+        function paintShapes(ctx, m, s, d, method) {
+          m.shapes[s].forEach(function (shape) {
+            var points = inflated(shape, m, d);
+            ctx.beginPath();
+            ctx.moveTo(points[0][0], points[0][1]);
+            for (var i = 1; i < points.length; i += 1) ctx.lineTo(points[i][0], points[i][1]);
+            ctx.closePath();
+            ctx[method]();
+          });
+        }
+
+        // The draw, as a function of the time alone: a wash under every full segment, the lit cells of every segment,
+        // then the frame and the spreading ring of every full segment. ctx is a canvas 2D context (a recording stand-in
+        // in the tests), sprites[tone][level] an image per level.
+        function drawFrame(ctx, m, sprites, t) {
+          ctx.clearRect(0, 0, m.canvasW, m.canvasH);
+          // A segment is full at at + seconds; u is the time since. What marks it comes in over a third of the pulse (the
+          // entrance time) and stays; the ring spreads and fades over the whole of it.
+          m.segments.forEach(function (seg, s) {
+            var u = t - (seg.at + seg.seconds);
+            if (!(u >= 0)) return;
+            ctx.globalAlpha = WASH_ALPHA * Math.min(1, (3 * u) / m.pulse);
+            ctx.fillStyle = m.colors[seg.tone];
+            paintShapes(ctx, m, s, 0, "fill");
+          });
+          ctx.globalAlpha = 1;
+          m.segments.forEach(function (seg) {
+            var set = sprites[seg.tone];
+            var n = startedCells(seg, t);
+            for (var k = 0; k < n; k += 1) {
+              var i = seg.first + k;
+              // a cell counted as started is at least level 1, whatever the rounding of the two start-time formulas
+              ctx.drawImage(set[levelAt(seg, k, t) || 1], cellLeft(m, i), cellTop(m, i));
+            }
+          });
+          m.segments.forEach(function (seg, s) {
+            var u = t - (seg.at + seg.seconds);
+            if (!(u >= 0)) return;
+            var x = Math.min(1, u / m.pulse);
+            ctx.strokeStyle = m.colors[seg.tone];
+            ctx.lineWidth = OUTLINE_PX;
+            ctx.globalAlpha = RESTING_ALPHA * Math.min(1, 3 * x);
+            paintShapes(ctx, m, s, 0, "stroke");
+            if (x < 1) {
+              ctx.lineWidth = OUTLINE_PX + 1;
+              ctx.globalAlpha = RING_ALPHA * (1 - x) * (1 - x);
+              paintShapes(ctx, m, s, RING_PX * x, "stroke");
+            }
+          });
+          ctx.globalAlpha = 1;
+        }
+
+        // What drawFrame reads: the segments and the outline of each, the grid, the glyph's place in its cell and the
+        // colour of each tone; and settledAt, the time from which the picture no longer changes (the last segment is full
+        // and its ring has gone), so the page can draw it once and copy it.
+        function modelFor(cfg, layout, pulse, colors) {
+          return {
+            segments: cfg.segments,
+            shapes: cfg.segments.map(function (seg) {
+              return outlineShapes(seg.first, seg.count, layout.grid.cols);
+            }),
+            cols: layout.grid.cols, px: layout.grid.px, py: layout.grid.py,
+            ox: layout.glyph.ox, oy: layout.glyph.oy,
+            canvasW: layout.canvasW, canvasH: layout.canvasH, pulse: pulse, colors: colors,
+            settledAt: SETTLE_EPS + pulse + Math.max.apply(null, cfg.segments.map(function (seg) { return seg.at + seg.seconds; })),
+          };
+        }
+
+        // The ticker: a proxy value that is the time in the slot, shown by a modifier on every render of the tween (not by
+        // onUpdate: a callback is skipped by a quiet seek, and a seek that jumps would leave the frame before on screen).
+        // show(t) draws everything that depends on the time; the proxy is returned for the tests.
+        function addTicker(tl, duration, show) {
+          var clock = { t: 0 };
+          tl.fromTo(
+            clock,
+            { t: 0 },
+            {
+              t: duration,
+              duration: duration,
+              ease: "none",
+              modifiers: {
+                t: function (value) {
+                  show(value);
+                  return value;
+                },
+              },
+            },
+            0,
+          );
+          return clock;
+        }
+        // logic:end
+
+        // The idiom of the other blocks: the declared defaults first, then what HyperFrames resolved for this
+        // composition (declared defaults plus the mount's overrides). A mounted composition's <html> is not in
+        // the page, so there the second step carries the defaults.
+        function readVars() {
+          var out = {};
+          var raw = document.documentElement.getAttribute("data-composition-variables");
+          if (raw) {
+            JSON.parse(raw).forEach(function (d) {
+              out[d.id] = d.default;
+            });
+          }
+          var hf = window.__hyperframes;
+          var overrides =
+            hf && typeof hf.getVariables === "function" ? hf.getVariables() : window.__hfVariables;
+          if (overrides && typeof overrides === "object") {
+            for (var key in overrides) if (overrides[key] !== undefined) out[key] = overrides[key];
+          }
+          return out;
+        }
+
+        var V = readVars();
+        // No literal fallbacks: a missing or wrong variable fails the render rather than drawing a wrong frame.
+        var cfg = readConfig(V);
+
+        var rootEl = document.querySelector("#bar-grid-root");
+        function token(name) {
+          var value = getComputedStyle(rootEl).getPropertyValue(name).trim();
+          if (!value) throw new Error("tokens.css is not loaded: " + name + " is empty");
+          return value;
+        }
+        function number(name) {
+          return Number.parseFloat(token(name));
+        }
+        var timing = timingInput(number);
+        var duration = Number.parseFloat(V.durationSeconds);
+        timing.duration = duration;
+        checkSlot(cfg.segments, timing);
+
+        var layout = layoutFor(cfg, {
+          sizes: { title: number("--size-title"), subtitle: number("--size-subtitle"), body: number("--size-body"), minText: number("--size-min-text") },
+          safeW: Number.parseFloat(rootEl.getAttribute("data-width")) - number("--safe-left") - number("--safe-right"),
+          safeH: Number.parseFloat(rootEl.getAttribute("data-height")) - number("--safe-top") - number("--safe-bottom"),
+          safeTop: number("--safe-top"),
+        });
+        var sizes = {
+          "--stack-top": layout.stackTop, "--stack-h": layout.stackH, "--fade": FADE, "--gap": GAP,
+          "--title-h": layout.titleH, "--title-line": layout.titleLine, "--grid-h": layout.grid.height,
+          "--margin": MARGIN, "--row-h": layout.rowH, "--count-size": layout.countSize,
+          "--swatch-w": layout.swatchW, "--swatch-h": layout.swatchH, "--count-w": layout.countW, "--unit-w": layout.unitW,
+          "--col-gap": COL_GAP, "--note-line": layout.noteLine,
+        };
+        Object.keys(sizes).forEach(function (name) {
+          rootEl.style.setProperty(name, sizes[name] + "px");
+        });
+
+        var stageEl = rootEl.querySelector(".stage");
+        var scrimEl = rootEl.querySelector(".scrim");
+        var titleEl = rootEl.querySelector(".title");
+        var gridEl = rootEl.querySelector(".grid");
+        var legendEl = rootEl.querySelector(".legend");
+        var noteEl = rootEl.querySelector(".note");
+        titleEl.textContent = cfg.title;
+        if (cfg.note) {
+          noteEl.textContent = cfg.note;
+        } else {
+          noteEl.remove();
+        }
+
+        // One legend row per segment: a swatch, the count (set from the time), the unit and the label.
+        var chipEls = [];
+        var countEls = [];
+        cfg.segments.forEach(function (seg) {
+          var chip = document.createElement("div");
+          chip.className = "chip";
+          chip.style.setProperty("--tone", "var(" + TONE_TOKEN[seg.tone] + ")");
+          [["swatch", ""], ["count", "0"], ["unit", cfg.unit], ["label", seg.label]].forEach(function (part) {
+            var el = document.createElement("span");
+            el.className = part[0];
+            el.textContent = part[1];
+            chip.appendChild(el);
+            if (part[0] === "count") countEls.push(el);
+          });
+          legendEl.appendChild(chip);
+          chipEls.push(chip);
+        });
+
+        // The sprites: one glyph per tone and level, built from token colours and alphas (no colour is written here).
+        var paper = token("--color-paper");
+        var glyph = layout.glyph;
+        function sprite(parts) {
+          var canvas = document.createElement("canvas");
+          canvas.width = glyph.w;
+          canvas.height = glyph.h;
+          var g = canvas.getContext("2d");
+          parts.forEach(function (part) {
+            g.globalAlpha = part.alpha;
+            g.fillStyle = part.colour;
+            for (var r = 0; r < (part.rows || glyph.h); r += 1) g.fillRect(glyph.insets[r], r, glyph.w - 2 * glyph.insets[r], 1);
+          });
+          return canvas;
+        }
+        var colors = {};
+        var sprites = {};
+        Object.keys(TONE_TOKEN).forEach(function (tone) {
+          colors[tone] = token(TONE_TOKEN[tone]);
+          sprites[tone] = [null];
+          for (var level = 1; level <= LEVELS; level += 1) {
+            var look = LOOK[level];
+            var parts = [{ colour: colors[tone], alpha: look[0] }];
+            if (look[1] > 0) parts.push({ colour: paper, alpha: look[1] });
+            if (glyph.topRows > 0) parts.push({ colour: paper, alpha: TOP_FACE_ALPHA * look[0], rows: glyph.topRows });
+            sprites[tone].push(sprite(parts));
+          }
+        });
+
+        // The empty cells are drawn once, faint, for every cell of the grid; the lit cells are redrawn from the time.
+        var emptyEl = rootEl.querySelector(".cells-empty");
+        var litEl = rootEl.querySelector(".cells-lit");
+        [emptyEl, litEl].forEach(function (el) {
+          el.width = layout.canvasW;
+          el.height = layout.canvasH;
+        });
+        var enter = timing.enter;
+        var model = modelFor(cfg, layout, enter, colors);
+        drawEmptyCells(emptyEl.getContext("2d"), model, sprite([{ colour: paper, alpha: EMPTY_ALPHA }]), cfg.total);
+        var litCtx = litEl.getContext("2d");
+        // From settledAt on the picture is the same at every time: it is drawn once and copied (one blit, not a draw of
+        // every cell, for the whole hold).
+        var settledEl = document.createElement("canvas");
+        settledEl.width = layout.canvasW;
+        settledEl.height = layout.canvasH;
+        drawFrame(settledEl.getContext("2d"), model, sprites, model.settledAt);
+
+        // The picture and the counts, each a function of the time alone.
+        function render(t) {
+          if (t >= model.settledAt) {
+            litCtx.clearRect(0, 0, layout.canvasW, layout.canvasH);
+            litCtx.drawImage(settledEl, 0, 0);
+          } else {
+            drawFrame(litCtx, model, sprites, t);
+          }
+          model.segments.forEach(function (seg, k) {
+            countEls[k].textContent = formatThousands(startedCells(seg, t));
+          });
+        }
+
+        var easeEnter = token("--ease-enter");
+        var tl = gsap.timeline({ paused: true });
+
+        // The band, the title and the grid arrive together; the note half an entrance after.
+        tl.fromTo(scrimEl, { opacity: 0 }, { opacity: 1, duration: enter, ease: easeEnter }, 0);
+        tl.fromTo(titleEl, { opacity: 0, y: 24 }, { opacity: 1, y: 0, duration: enter, ease: easeEnter }, 0);
+        tl.fromTo(gridEl, { opacity: 0 }, { opacity: 1, duration: enter, ease: easeEnter }, 0);
+        if (cfg.note) {
+          tl.fromTo(noteEl, { opacity: 0, y: 12 }, { opacity: 1, y: 0, duration: enter, ease: easeEnter }, enter / 2);
+        }
+        // A legend row arrives when its segment starts to fill.
+        cfg.segments.forEach(function (seg, k) {
+          tl.fromTo(chipEls[k], { opacity: 0, y: 16 }, { opacity: 1, y: 0, duration: enter, ease: easeEnter }, seg.at);
+        });
+        addTicker(tl, duration, render);
+        // The slot ends with the fade out.
+        tl.fromTo(
+          stageEl,
+          { opacity: 1 },
+          { opacity: 0, duration: timing.exit, ease: token("--ease-exit"), immediateRender: false },
+          duration - timing.exit,
+        );
+
+        window.__timelines = window.__timelines || {};
+        window.__timelines["bar-grid"] = tl;
+      })();
+    </script>
+  </body>
+</html>

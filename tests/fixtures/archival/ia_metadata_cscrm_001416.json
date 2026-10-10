@@ -1,0 +1,85 @@
+{
+  "files": [
+    {
+      "name": "__ia_thumb.jpg",
+      "source": "original",
+      "size": "9788",
+      "format": "Item Tile",
+      "rotation": "0"
+    },
+    {
+      "name": "cscrm_001416_access.jpg",
+      "source": "original",
+      "size": "6265995",
+      "format": "JPEG",
+      "rotation": "0"
+    },
+    {
+      "name": "cscrm_001416_access_thumb.jpg",
+      "source": "derivative",
+      "format": "JPEG Thumb",
+      "original": "cscrm_001416_access.jpg",
+      "size": "8459"
+    },
+    {
+      "name": "cscrm_001416_files.xml",
+      "source": "original",
+      "format": "Metadata"
+    },
+    {
+      "name": "cscrm_001416_meta.sqlite",
+      "source": "original",
+      "size": "32768",
+      "format": "Metadata"
+    },
+    {
+      "name": "cscrm_001416_meta.xml",
+      "source": "original",
+      "size": "3265",
+      "format": "Metadata"
+    },
+    {
+      "name": "cscrm_001416_metadata.xml",
+      "source": "original",
+      "size": "6472",
+      "format": "XML"
+    }
+  ],
+  "files_count": 7,
+  "item_size": 6326747,
+  "metadata": {
+    "identifier": "cscrm_001416",
+    "call_number": "FCL_PJ_582",
+    "collection": [
+      "californiastaterailroadmuseum",
+      "californiarevealed",
+      "stream_only",
+      "americana"
+    ],
+    "creator": "Schmidt Litho. Co.",
+    "date": "XXXX",
+    "description": [
+      "<b>Please visit the California Revealed website to see the most complete and up-to-date version of this object: <a href=\"https://repository.californiarevealed.org/node/456513\" rel=\"ugc nofollow\">https://repository.californiarevealed.org/node/456513</a>.</b>",
+      "Peeled Apricots",
+      "Peeled Apricots"
+    ],
+    "language": "eng",
+    "licenseurl": "http://creativecommons.org/publicdomain/mark/1.0/",
+    "mediatype": "image",
+    "projectidentifier": "caps00026063",
+    "rights": "Copyright status unknown. This work may be protected by the U.S. Copyright Law (Title 17, U.S.C.). In addition, its reproduction may be restricted by terms of gift or purchase agreements, donor restrictions, privacy and publicity rights, licensing and trademarks. This work is accessible for purposes of education and research. Transmission or reproduction of works protected by copyright beyond that allowed by fair use requires the written permission of the copyright owners. Works not in the public domain cannot be commercially exploited without permission of the copyright owner. Responsibility for any use rests exclusively with the user. California State Railroad Museum Library & Archives attempted to find rights owners without success but is eager to hear from them so that we may obtain permission, if needed. Upon request to library@example.org, digitized works can be removed from public view if there are rights issues that need to be resolved.",
+    "source": "Lithograph: 1 file (4.25 x 10.75 in)",
+    "subject": [
+      "californiarevealed",
+      "Fruit crate labels",
+      "Apricot"
+    ],
+    "title": "Gold Bar",
+    "title-collection-guide": "California State Railroad Museum Fruit Crate Label Collection",
+    "title-series": "California State Railroad Museum Fruit Crate Label Collection",
+    "publicdate": "2023-05-27 00:52:22",
+    "addeddate": "2023-05-27 00:52:22",
+    "access-restricted-item": "true",
+    "filesxml": "Fri Apr 3 14:24:29 UTC 2026"
+  }
+}

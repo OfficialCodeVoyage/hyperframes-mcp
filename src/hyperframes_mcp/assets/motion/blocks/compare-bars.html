@@ -1,0 +1,554 @@
+<!--
+  Copyright 2026 the hyperframes-mcp contributors. Hand-written for the motion library (src/hyperframes_mcp/motion), to the component
+  contract in docs/motion-library.md. No third-party code.
+
+  Two to four horizontal bars on one scale, one above the other: each grows from the left to its value (a clip-path wipe,
+  never a width tween) in its tone with its own outline, and carries its label and display. A long bar holds its text
+  inside it, a short one has its text to the right of it; a bar of four percent of the largest is still a clearly outlined
+  sliver (the least share drawn is one percent). The scale is the largest bar or scaleMax, never printed: the only numbers on
+  screen are the texts of the variables.
+
+  Everything is positioned from numbers computed between the logic markers (the length of each bar on the scale, the width
+  of each text from the advance table of the label face, inside or beside, the rows, the time plan);
+  tests/motion/test_compare_bars.py runs them in Node. Every colour, size, duration and ease comes from tokens.css.
+-->
+<!doctype html>
+<html
+  lang="en"
+  data-composition-variables='[
+    {"id":"durationSeconds","type":"number","label":"Seconds on screen, growth, reading time and fade out included","default":10,"min":3.3,"max":40,"step":0.1,"unit":"s"},
+    {"id":"title","type":"string","label":"What the bars measure, above them","default":"Gold, in tonnes","maxLength":40},
+    {"id":"bars","type":"string","label":"Bars as JSON, 2 to 4, top to bottom: [{\"label\":\"American gold, 1945\",\"display\":\"about 20,000 tonnes\",\"value\":20000,\"tone\":\"paper\",\"at\":1,\"seconds\":1.4}]. value is the length on the scale of scaleMax; tone is gold, paper, ember or mute; at is the second of the slot when it starts to grow","default":"[{\"label\":\"American gold, 1945\",\"display\":\"about 20,000 tonnes\",\"value\":20000,\"tone\":\"paper\",\"at\":1,\"seconds\":1.4},{\"label\":\"The whole Bundesbank ledger\",\"display\":\"about 791 tonnes\",\"value\":791,\"tone\":\"gold\",\"at\":2.8,\"seconds\":1.2}]"},
+    {"id":"scaleMax","type":"number","label":"The scale: the value of a bar the full width. At least the largest value","default":20000,"step":1},
+    {"id":"note","type":"string","label":"A short line under the bars, or empty for none","default":"","maxLength":70}
+  ]'
+>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <title>Compare bars</title>
+    <link rel="stylesheet" href="tokens.css" />
+    <script src="vendor/gsap.min.js"></script>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        width: 1920px;
+        height: 1080px;
+        overflow: hidden;
+        background: transparent;
+      }
+      #cb-root {
+        position: relative;
+        width: 1920px;
+        height: 1080px;
+        overflow: hidden;
+      }
+      .cb-stage {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+      }
+      /* A band behind the graphic, the width of the frame and 170 px taller than the graphic at each end, soft at its top
+         and bottom edge (full from 140 px in): the texts read on any shot. */
+      .cb-scrim {
+        position: absolute;
+        top: -170px;
+        bottom: -170px;
+        left: calc(-1 * var(--safe-left));
+        right: calc(-1 * var(--safe-right));
+        opacity: 0;
+        background: linear-gradient(
+          to bottom,
+          transparent 0px,
+          color-mix(in srgb, var(--color-scrim) 12%, transparent) 25px,
+          color-mix(in srgb, var(--color-scrim) 38%, transparent) 55px,
+          color-mix(in srgb, var(--color-scrim) 68%, transparent) 95px,
+          color-mix(in srgb, var(--color-scrim) 88%, transparent) 140px,
+          color-mix(in srgb, var(--color-scrim) 88%, transparent) calc(100% - 140px),
+          color-mix(in srgb, var(--color-scrim) 68%, transparent) calc(100% - 95px),
+          color-mix(in srgb, var(--color-scrim) 38%, transparent) calc(100% - 55px),
+          color-mix(in srgb, var(--color-scrim) 12%, transparent) calc(100% - 25px),
+          transparent 100%
+        );
+      }
+      .cb-stack {
+        position: absolute;
+      }
+      /* The tones: the fill of a bar, the colour its display is printed in beside it, and the colour of text inside it. */
+      .cb-tone-gold {
+        --tone: var(--color-gold);
+        --tone-text: var(--color-gold);
+        --tone-on: var(--color-ink);
+      }
+      .cb-tone-paper {
+        --tone: var(--color-paper);
+        --tone-text: var(--color-paper);
+        --tone-on: var(--color-ink);
+      }
+      .cb-tone-ember {
+        --tone: var(--color-loss);
+        --tone-text: var(--color-loss);
+        --tone-on: var(--color-ink);
+      }
+      .cb-tone-mute {
+        --tone: color-mix(in srgb, var(--color-paper-aged) 38%, var(--color-night));
+        --tone-text: var(--color-paper-aged);
+        --tone-on: var(--color-paper);
+      }
+      .cb-head {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        white-space: nowrap;
+        font-family: var(--font-label);
+        font-weight: 600;
+        font-size: var(--size-body);
+        line-height: 1.2;
+        color: var(--color-paper);
+        opacity: 0;
+      }
+      /* A bar has its own outline, so the thinnest one is a clear sliver. */
+      .cb-bar {
+        position: absolute;
+        left: 0;
+        border: 3px solid var(--color-paper);
+        background: var(--tone);
+      }
+      .cb-text {
+        position: absolute;
+        white-space: nowrap;
+        opacity: 0;
+      }
+      .cb-label {
+        font-family: var(--font-label);
+        font-weight: 600;
+        font-size: var(--size-label);
+        line-height: 1.2;
+        color: var(--color-paper);
+      }
+      .cb-display {
+        font-family: var(--font-label);
+        font-weight: 500;
+        font-size: var(--size-label);
+        line-height: 1.2;
+        color: var(--tone-text);
+        font-variant-numeric: tabular-nums;
+      }
+      .cb-inside .cb-label,
+      .cb-inside .cb-display {
+        color: var(--tone-on);
+      }
+      .cb-note {
+        position: absolute;
+        left: 0;
+        white-space: nowrap;
+        font-family: var(--font-label);
+        font-weight: 500;
+        font-size: var(--size-min-text);
+        line-height: 1.2;
+        color: var(--color-paper-aged);
+        opacity: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <div
+      id="cb-root"
+      data-composition-id="compare-bars"
+      data-width="1920"
+      data-height="1080"
+      data-start="0"
+      data-duration="10"
+    >
+      <div class="cb-stage">
+        <div class="cb-stack">
+          <div class="cb-scrim"></div>
+          <div class="cb-head"></div>
+          <div class="cb-note"></div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      (function () {
+        "use strict";
+
+        // logic:begin
+        // The arithmetic of the block, with no DOM in it: tests/motion/test_compare_bars.py runs these functions in Node, and
+        // the composer's preflight (src/hyperframes_mcp/motion/preflight.py) runs minSlot from this same text.
+
+        var NAME = "compare-bars";
+        // The canvas of the tokens (tokens.json, canvas; also the root's data-width and data-height).
+        var CANVAS_W = 1920;
+        var CANVAS_H = 1080;
+        // What the variables may hold (the maxLength values of the declaration above).
+        var MAX_TITLE = 40;
+        var MAX_LABEL = 34;
+        var MAX_DISPLAY = 24;
+        var MAX_NOTE = 70;
+        var MIN_BARS = 2;
+        var MAX_BARS = 4;
+        var TONES = ["gold", "paper", "ember", "mute"];
+        // A bar shorter than this share of the scale is too short to draw.
+        var MIN_SHARE = 0.01;
+
+        // Geometry in px. A bar is as long as its share of the safe width and as tall as its two lines of text and
+        // BAR_PAD (140 px at the label size of 52).
+        var BAR_PAD = 16;
+        var ROW_GAP = 28;
+        var HEAD_GAP = 36; // between the title and the first bar
+        var PAD_IN = 28; // between the left end of a bar and the text inside it, and its right end
+        var OUT_GAP = 28; // between the right end of a bar and the text beside it
+        var NOTE_GAP = 40;
+        var LINE_EM = 1.2;
+
+        // The advance of each printable ASCII character from space (32), in thousandths of an em: the widest of
+        // IBM Plex Sans Condensed Medium, SemiBold and Bold, so a text is never wider than this says (kerning only
+        // narrows it). tests/motion/test_split_bar_layout.py checks the table, which split-bar carries too.
+        var ADVANCE = [
+          212, 292, 452, 605, 537, 884, 652, 244, 304, 304, 556, 540, 284, 362, 284, 422, 540, 540, 540, 540, 540, 540, 540,
+          540, 540, 540, 304, 304, 540, 540, 540, 452, 814, 618, 602, 589, 630, 549, 528, 646, 654, 397, 506, 630, 480, 738,
+          654, 642, 595, 642, 610, 556, 527, 630, 598, 884, 612, 579, 546, 302, 422, 302, 540, 505, 540, 516, 550, 468, 550,
+          508, 341, 499, 540, 262, 266, 524, 277, 808, 540, 508, 550, 550, 367, 455, 342, 540, 490, 756, 501, 496, 466, 338,
+          370, 338, 540,
+        ];
+        // The typographic marks the label face has; any other character counts as the widest glyph of Latin-1 and
+        // Latin Extended-A, so an unusual letter only makes the layout more careful.
+        var ADVANCE_OTHER = {
+          "–": 528,
+          "—": 702,
+          "‘": 284,
+          "’": 284,
+          "“": 499,
+          "”": 499,
+          "…": 816,
+        };
+        var ADVANCE_WIDEST = 900;
+
+        function fail(message) {
+          throw new Error(NAME + ": " + message);
+        }
+
+        function wordCount(text) {
+          return text.split(/\s+/).filter(Boolean).length;
+        }
+
+        function textEm(text) {
+          var em = 0;
+          for (var i = 0; i < text.length; i += 1) {
+            var code = text.charCodeAt(i);
+            var thousandths = ADVANCE_WIDEST;
+            if (code >= 32 && code <= 126) thousandths = ADVANCE[code - 32];
+            else if (ADVANCE_OTHER[text[i]] !== undefined) thousandths = ADVANCE_OTHER[text[i]];
+            em += thousandths / 1000;
+          }
+          return em;
+        }
+
+        function textWidth(text, size) {
+          return Math.ceil(textEm(text) * size - 1e-9);
+        }
+
+        // The width of a two-line label: the wider of its two lines.
+        function blockWidth(label, display, size) {
+          return Math.max(textWidth(label, size), textWidth(display, size));
+        }
+
+        // A variable that holds a JSON list: the text is parsed, a list passed by the host is used as it is.
+        function parseList(raw, name) {
+          if (raw === undefined || raw === null) fail("the " + name + " variable is missing");
+          if (typeof raw !== "string") return raw;
+          var trimmed = raw.trim();
+          if (trimmed === "") return [];
+          try {
+            return JSON.parse(trimmed);
+          } catch (error) {
+            return fail("the " + name + " variable is not valid JSON (" + error.message + ")");
+          }
+        }
+
+        function needText(value, what, max, allowEmpty) {
+          if (typeof value !== "string") fail(what + " is missing or is not text");
+          var text = value.trim();
+          if (text === "" && !allowEmpty) fail(what + " is empty");
+          if (text.length > max) fail(what + " is " + text.length + " characters; at most " + max);
+          return text;
+        }
+
+        function needNumber(value, what) {
+          if (typeof value !== "number" || !Number.isFinite(value)) fail(what + " is missing or is not a number");
+          return value;
+        }
+
+        function needTime(value, what) {
+          var seconds = needNumber(value, what);
+          if (seconds < 0) fail(what + " is negative (" + seconds + " s)");
+          return seconds;
+        }
+
+        function needObject(raw, what, fields) {
+          if (!raw || typeof raw !== "object" || Array.isArray(raw)) fail(what + " must be an object with " + fields);
+        }
+
+        // What the block draws, checked: no literal fallback for a missing field.
+        function readContent(V) {
+          var scaleMax = needNumber(V.scaleMax, "the scaleMax variable");
+          if (scaleMax <= 0) fail("the scaleMax variable must be greater than 0");
+          var raw = parseList(V.bars, "bars");
+          if (!Array.isArray(raw) || raw.length < MIN_BARS || raw.length > MAX_BARS) {
+            fail("the bars variable must be a list of " + MIN_BARS + " to " + MAX_BARS + " bars");
+          }
+          var bars = raw.map(function (bar, i) {
+            var at = "bars[" + i + "]";
+            needObject(bar, at, "label, display, value, tone, at and seconds");
+            var label = needText(bar.label, at + ".label", MAX_LABEL);
+            var display = needText(bar.display, at + ".display", MAX_DISPLAY);
+            var value = needNumber(bar.value, at + ".value");
+            if (value <= 0) fail(at + ".value must be greater than 0");
+            if (value > scaleMax * (1 + 1e-9)) fail(at + ".value (" + value + ") is over scaleMax (" + scaleMax + ")");
+            if (value / scaleMax < MIN_SHARE - 1e-9) {
+              fail(at + " is under " + MIN_SHARE * 100 + " percent of scaleMax: too short to draw");
+            }
+            if (TONES.indexOf(bar.tone) < 0) fail(at + '.tone "' + bar.tone + '" is not one of ' + TONES.join(", "));
+            var when = needTime(bar.at, at + ".at");
+            var seconds = needNumber(bar.seconds, at + ".seconds");
+            if (seconds <= 0) fail(at + ".seconds must be greater than 0");
+            return { label: label, display: display, value: value, tone: bar.tone, at: when, seconds: seconds };
+          });
+          return {
+            title: needText(V.title, "the title variable", MAX_TITLE),
+            scaleMax: scaleMax,
+            bars: bars,
+            note: needText(V.note, "the note variable", MAX_NOTE, true),
+          };
+        }
+
+        // The geometry input from the tokens: tok(name) is the number of a token custom property.
+        function geometryInput(tok) {
+          return {
+            safeW: CANVAS_W - tok("--safe-left") - tok("--safe-right"),
+            safeH: CANVAS_H - tok("--safe-top") - tok("--safe-bottom"),
+            safeLeft: tok("--safe-left"),
+            safeTop: tok("--safe-top"),
+            label: tok("--size-label"),
+            head: tok("--size-body"),
+            note: tok("--size-min-text"),
+          };
+        }
+
+        // Where everything goes, in px: each bar from the left end of the safe width, as long as its share of the scale,
+        // with its text inside it when the text fits with a margin and beside it (to its right) when it does not, the
+        // title, the note, and the whole centred in the safe zone. A text that fits neither way is an error that names it.
+        function layoutFor(c, g) {
+          var trackW = g.safeW;
+          var blockH = 2 * Math.round(LINE_EM * g.label); // a label is two lines
+          var barH = blockH + BAR_PAD;
+          var headH = Math.round(LINE_EM * g.head);
+          if (textWidth(c.title, g.head) > trackW) {
+            fail("the title variable is too wide for one line (" + textWidth(c.title, g.head) + " px of " + trackW + "): shorten it");
+          }
+          var noteH = Math.round(LINE_EM * g.note);
+          if (c.note && textWidth(c.note, g.note) > trackW) {
+            fail("the note variable is too wide for one line (" + textWidth(c.note, g.note) + " px of " + trackW + "): shorten it");
+          }
+          var bars = c.bars.map(function (bar, i) {
+            var width = Math.round((bar.value / c.scaleMax) * trackW);
+            var w = blockWidth(bar.label, bar.display, g.label);
+            var inside = width >= w + 2 * PAD_IN;
+            var textLeft = inside ? PAD_IN : width + OUT_GAP;
+            if (textLeft + w > trackW) {
+              fail("the text of bars[" + i + "] (" + w + " px) fits neither inside its bar nor beside it: shorten the label or the display");
+            }
+            var y = headH + HEAD_GAP + i * (barH + ROW_GAP);
+            return {
+              y: y,
+              h: barH,
+              width: width,
+              inside: inside,
+              textLeft: textLeft,
+              textTop: y + BAR_PAD / 2,
+              textW: w,
+              textH: blockH,
+            };
+          });
+          var barsEnd = headH + HEAD_GAP + c.bars.length * barH + (c.bars.length - 1) * ROW_GAP;
+          var noteY = barsEnd + NOTE_GAP;
+          var total = c.note ? noteY + noteH : barsEnd;
+          if (total > g.safeH) fail("the graphic is " + total + " px tall but the safe zone holds " + g.safeH + ": leave out the note");
+          var stackY = Math.round(g.safeTop + (g.safeH - total) / 2);
+          return {
+            stackX: g.safeLeft,
+            stackY: stackY,
+            width: trackW,
+            total: total,
+            head: { h: headH },
+            note: c.note ? { y: noteY, h: noteH } : null,
+            bars: bars,
+          };
+        }
+
+        // When everything happens, and the shortest slot. The title and the note are in from the start; a bar grows at its
+        // own time for its own seconds (bars may grow together); its text arrives when it has grown. Each text holds for
+        // its reading time (the tokens' read_min plus read_per_word a word) before the fade out, so the shortest slot is
+        // the latest of those ends plus the exit. tok(name) is the number of a token custom property.
+        function timePlan(c, tok) {
+          var enter = tok("--dur-enter");
+          var exit = tok("--dur-exit");
+          var micro = tok("--dur-micro");
+          var readMin = tok("--dur-read-min");
+          var readPerWord = tok("--dur-read-per-word");
+          function reading(text) {
+            return readMin + readPerWord * wordCount(text);
+          }
+          var ends = [enter + reading(c.title)];
+          if (c.note) ends.push(enter + reading(c.note));
+          // a bar's text arrives when it has grown
+          var textAt = c.bars.map(function (bar, i) {
+            if (bar.seconds < micro - 1e-9) {
+              fail("bars[" + i + "].seconds is " + bar.seconds + " s; a bar needs at least " + micro + " s to grow");
+            }
+            ends.push(bar.at + bar.seconds + enter + reading(bar.label + " " + bar.display));
+            return bar.at + bar.seconds;
+          });
+          return { enter: enter, exit: exit, textAt: textAt, needed: Math.max.apply(null, ends) + exit };
+        }
+
+        // The shortest slot for these variables. It throws what the page would throw for variables it refuses (a text
+        // that fits nowhere included), so the preflight sees it before a render does.
+        function minSlot(V, tok) {
+          var c = readContent(V);
+          layoutFor(c, geometryInput(tok));
+          return timePlan(c, tok).needed;
+        }
+        // logic:end
+
+        // The idiom of the other blocks: the declared defaults first, then what HyperFrames resolved for this
+        // composition (declared defaults plus the mount's overrides). A mounted composition's <html> is not in
+        // the page, so there the second step carries the defaults.
+        function readVars() {
+          var out = {};
+          var raw = document.documentElement.getAttribute("data-composition-variables");
+          if (raw) {
+            JSON.parse(raw).forEach(function (d) {
+              out[d.id] = d.default;
+            });
+          }
+          var hf = window.__hyperframes;
+          var overrides =
+            hf && typeof hf.getVariables === "function" ? hf.getVariables() : window.__hfVariables;
+          if (overrides && typeof overrides === "object") {
+            for (var key in overrides) if (overrides[key] !== undefined) out[key] = overrides[key];
+          }
+          return out;
+        }
+
+        var V = readVars();
+        // No literal fallbacks: a missing or wrong variable fails the render rather than drawing a wrong frame.
+        var content = readContent(V);
+
+        var rootEl = document.querySelector("#cb-root");
+        function token(name) {
+          var value = getComputedStyle(rootEl).getPropertyValue(name).trim();
+          if (!value) throw new Error("tokens.css is not loaded: " + name + " is empty");
+          return value;
+        }
+        function number(name) {
+          return Number.parseFloat(token(name));
+        }
+        var layout = layoutFor(content, geometryInput(number));
+        var plan = timePlan(content, number);
+        var duration = Number.parseFloat(V.durationSeconds);
+        if (!Number.isFinite(duration) || duration + 1e-6 < plan.needed) {
+          throw new Error(
+            NAME + ": durationSeconds " + V.durationSeconds + " is shorter than the " + plan.needed.toFixed(2) +
+              " s it needs (every bar grown, its text arriving and read, the fade out)",
+          );
+        }
+
+        function place(el, box) {
+          for (var key in box) el.style[key] = box[key] + "px";
+        }
+        function make(parent, className, text) {
+          var el = document.createElement("div");
+          el.className = className;
+          if (text !== undefined) el.textContent = text;
+          parent.appendChild(el);
+          return el;
+        }
+
+        var stageEl = document.querySelector(".cb-stage");
+        var scrimEl = document.querySelector(".cb-scrim");
+        var stackEl = document.querySelector(".cb-stack");
+        var headEl = document.querySelector(".cb-head");
+        var noteEl = document.querySelector(".cb-note");
+        headEl.textContent = content.title;
+
+        place(stackEl, { left: layout.stackX, top: layout.stackY, width: layout.width, height: layout.total });
+        place(headEl, { height: layout.head.h });
+        if (layout.note) {
+          noteEl.textContent = content.note;
+          place(noteEl, { top: layout.note.y, height: layout.note.h });
+        }
+
+        var rows = content.bars.map(function (bar, i) {
+          var box = layout.bars[i];
+          var barEl = make(stackEl, "cb-bar cb-tone-" + bar.tone);
+          place(barEl, { top: box.y, width: box.width, height: box.h });
+          var textEl = make(stackEl, "cb-text " + (box.inside ? "cb-inside " : "") + "cb-tone-" + bar.tone);
+          make(textEl, "cb-label", bar.label);
+          make(textEl, "cb-display", bar.display);
+          place(textEl, { left: box.textLeft, top: box.textTop, width: box.textW, height: box.textH });
+          return { bar: barEl, text: textEl };
+        });
+
+        var enter = plan.enter;
+        var exit = plan.exit;
+        var easeEnter = token("--ease-enter");
+        var RISE = 12; // entrance travel in px: under the 24 px of the motion rules
+
+        var tl = gsap.timeline({ paused: true });
+
+        // The title, the note and the backing arrive together.
+        tl.fromTo(scrimEl, { opacity: 0 }, { opacity: 1, duration: enter, ease: easeEnter }, 0);
+        tl.fromTo(headEl, { opacity: 0, y: RISE }, { opacity: 1, y: 0, duration: enter, ease: easeEnter }, 0);
+        if (layout.note) {
+          tl.fromTo(noteEl, { opacity: 0 }, { opacity: 1, duration: enter, ease: easeEnter }, 0);
+        }
+        // Each bar grows from its left end; its text arrives when it has grown.
+        rows.forEach(function (row, i) {
+          var bar = content.bars[i];
+          tl.fromTo(
+            row.bar,
+            { clipPath: "inset(0% 100% 0% 0%)" },
+            { clipPath: "inset(0% 0% 0% 0%)", duration: bar.seconds, ease: easeEnter },
+            bar.at,
+          );
+          tl.fromTo(
+            row.text,
+            { opacity: 0, y: RISE },
+            { opacity: 1, y: 0, duration: enter, ease: easeEnter },
+            plan.textAt[i],
+          );
+        });
+        // The slot ends with the fade out.
+        tl.fromTo(
+          stageEl,
+          { opacity: 1 },
+          { opacity: 0, duration: exit, ease: token("--ease-exit"), immediateRender: false },
+          duration - exit,
+        );
+
+        window.__timelines = window.__timelines || {};
+        window.__timelines["compare-bars"] = tl;
+      })();
+    </script>
+  </body>
+</html>

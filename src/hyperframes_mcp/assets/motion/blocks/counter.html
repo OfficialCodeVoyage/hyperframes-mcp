@@ -1,0 +1,479 @@
+<!--
+  Copyright 2026 the hyperframes-mcp contributors. Hand-written for the motion library (src/hyperframes_mcp/motion), to the component
+  contract in docs/motion-library.md. The idea follows the HyperFrames registry component count-up
+  (Apache-2.0): tabular figures, a value that lands exactly on the target, a quiet finish. No code is copied; the
+  upstream file is a demo with overshoot, a drifting hold, a CDN script and a count built from per-frame rows.
+
+  A count-up to a target, in gold on a scrim: the figure arrives, counts over the cinematic duration with the emphasis
+  ease (a proxy object whose value a GSAP modifier shows as text, so it is exact at every frame and after any seek),
+  then the unit and the label arrive after the count lands. The settle is a small scale tween that ends on 1.
+  Contrast: gold and paper on the scrim stay above 4.5:1 with the scrim at 82% over pure white
+  (tests/motion/test_counter.py). Every colour, size, duration and ease comes from tokens.css.
+-->
+<!doctype html>
+<html
+  lang="en"
+  data-composition-variables='[
+    {"id":"durationSeconds","type":"number","label":"Seconds on screen, arrival and fade out included","default":8,"min":5,"max":16,"step":0.1,"unit":"s"},
+    {"id":"from","type":"number","label":"Value the count starts from","default":0,"step":1},
+    {"id":"to","type":"number","label":"Target value the count lands on","default":8198,"step":1},
+    {"id":"prefix","type":"string","label":"Text before the figure, such as a currency sign","default":"","maxLength":8},
+    {"id":"suffix","type":"string","label":"Unit after the figure, shown when the count lands","default":"bars","maxLength":24},
+    {"id":"decimals","type":"number","label":"Decimal places","default":0,"min":0,"max":4,"step":1},
+    {"id":"label","type":"string","label":"Line under the figure","default":"of bullion counted in the mine","maxLength":80},
+    {"id":"thousandsSeparator","type":"boolean","label":"Group thousands with a comma","default":true}
+  ]'
+>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <title>Counter</title>
+    <link rel="stylesheet" href="tokens.css" />
+    <script src="vendor/gsap.min.js"></script>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        width: 1920px;
+        height: 1080px;
+        overflow: hidden;
+        background: transparent;
+      }
+      #counter-root {
+        position: relative;
+        width: 1920px;
+        height: 1080px;
+        overflow: hidden;
+      }
+      #counter-root .stage {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+      }
+      /* A band behind the figure, soft at its top and bottom edge: the figure reads on any shot. */
+      #counter-root .scrim {
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: 50%;
+        height: calc(var(--size-title) * 6.5);
+        margin-top: calc(var(--size-title) * -3.25);
+        background: linear-gradient(
+          to bottom,
+          transparent 0%,
+          color-mix(in srgb, var(--color-scrim) 12%, transparent) 8%,
+          color-mix(in srgb, var(--color-scrim) 38%, transparent) 15%,
+          color-mix(in srgb, var(--color-scrim) 68%, transparent) 22%,
+          color-mix(in srgb, var(--color-scrim) 82%, transparent) 30%,
+          color-mix(in srgb, var(--color-scrim) 82%, transparent) 70%,
+          color-mix(in srgb, var(--color-scrim) 68%, transparent) 78%,
+          color-mix(in srgb, var(--color-scrim) 38%, transparent) 85%,
+          color-mix(in srgb, var(--color-scrim) 12%, transparent) 92%,
+          transparent 100%
+        );
+        opacity: 0;
+      }
+      #counter-root .group {
+        position: absolute;
+        left: var(--safe-left);
+        right: var(--safe-right);
+        top: var(--safe-top);
+        bottom: var(--safe-bottom);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        opacity: 0;
+      }
+      #counter-root .figure {
+        display: flex;
+        align-items: baseline;
+        justify-content: center;
+        font-family: var(--font-display);
+        font-weight: 500;
+        font-size: var(--figure-size);
+        line-height: 1;
+        color: var(--color-gold);
+        font-variant-numeric: tabular-nums;
+        font-feature-settings: "tnum" 1;
+        white-space: nowrap;
+        transform-origin: 50% 60%;
+      }
+      #counter-root .affix {
+        font-size: var(--size-title);
+        line-height: 1;
+      }
+      #counter-root .affix:empty {
+        display: none;
+      }
+      #counter-root .prefix {
+        margin-right: 0.1em;
+      }
+      #counter-root .suffix {
+        margin-left: 0.25em;
+        opacity: 0;
+      }
+      /* The ghost holds the width of the target so nothing moves while the digits change; the live text sits on it. */
+      #counter-root .value {
+        position: relative;
+        display: block;
+      }
+      #counter-root .ghost {
+        display: block;
+        visibility: hidden;
+      }
+      #counter-root .live {
+        position: absolute;
+        left: 0;
+        top: 0;
+      }
+      #counter-root .label {
+        margin-top: calc(var(--size-label) * 0.5);
+        max-width: 100%;
+        text-align: center;
+        text-wrap: balance;
+        font-family: var(--font-label);
+        font-weight: 500;
+        font-size: var(--size-label);
+        line-height: 1.2;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--color-paper);
+        opacity: 0;
+      }
+      #counter-root .label:empty {
+        display: none;
+      }
+    </style>
+  </head>
+  <body>
+    <div
+      id="counter-root"
+      data-composition-id="counter"
+      data-width="1920"
+      data-height="1080"
+      data-start="0"
+      data-duration="8"
+    >
+      <div class="stage">
+        <div class="scrim"></div>
+        <div class="group">
+          <div class="figure">
+            <span class="affix prefix"></span>
+            <span class="value"><span class="ghost"></span><span class="live"></span></span>
+            <span class="affix suffix"></span>
+          </div>
+          <p class="label"></p>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      (function () {
+        "use strict";
+
+        // logic:begin
+        // The arithmetic of the block, with no DOM in it: tests/motion/test_counter.py runs these functions in Node.
+
+        // Newsreader at weight 500 and the largest optical size, as the browser draws a figure this big (0.62 em digits,
+        // measured with fontTools; the default instance of the file says 0.55, which is narrower than what is drawn),
+        // with a little margin. Other characters count as a digit.
+        var FIGURE_EM = { ",": 0.25, ".": 0.25, "−": 0.58 };
+        var DIGIT_EM = 0.63;
+        // A unit or a prefix is ordinary text: a generous average advance, and the gaps the stylesheet puts around it.
+        var AFFIX_EM = 0.75;
+        var PREFIX_GAP_EM = 0.1;
+        var SUFFIX_GAP_EM = 0.25;
+        // The count starts while the arrival is half done, so the climb is seen; the label follows the unit by one line.
+        var COUNT_LEAD = 0.5;
+
+        function wordCount(text) {
+          return text.split(/\s+/).filter(Boolean).length;
+        }
+
+        // No literal fallbacks: a missing or wrong variable fails the render rather than drawing a wrong frame.
+        function needText(V, name) {
+          if (typeof V[name] !== "string") {
+            throw new Error("counter: the " + name + " variable is missing or is not text");
+          }
+          return V[name].trim();
+        }
+
+        // The value as shown: rounded to the decimals, grouped when asked, never "-0".
+        function formatValue(value, decimals, thousands) {
+          var fixed = Math.abs(value).toFixed(decimals);
+          var parts = fixed.split(".");
+          var whole = thousands ? parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",") : parts[0];
+          var text = parts.length > 1 ? whole + "." + parts[1] : whole;
+          return value < 0 && Number(fixed) !== 0 ? "−" + text : text;
+        }
+
+        // Where the count starts and the arrival ends, and what the slot holds besides the count itself: the arrival
+        // (the count starts while it is half done), the unit and the label, the reading time and the fade out.
+        function phases(p) {
+          var countAt = p.enter * COUNT_LEAD;
+          var arrival = p.stagger + p.enter;
+          return {
+            countAt: countAt,
+            arrival: arrival,
+            rest: countAt + arrival + (p.readMin + p.readPerWord * p.words) + p.exit,
+          };
+        }
+
+        // The shortest slot: the rest, and a count of at least the cinematic minimum.
+        function neededOf(p) {
+          return phases(p).rest + p.cinMin;
+        }
+
+        // The countPlan input that comes from the variables and the tokens (the page adds the duration).
+        // tok(name) is the number of a token custom property.
+        function planInput(V, tok) {
+          return {
+            enter: tok("--dur-enter"),
+            exit: tok("--dur-exit"),
+            cinMin: tok("--dur-cinematic-min"),
+            cinMax: tok("--dur-cinematic-max"),
+            readMin: tok("--dur-read-min"),
+            readPerWord: tok("--dur-read-per-word"),
+            stagger: 0.25, // one line after the other: the group stagger is at most --dur-group-stagger-total-max
+            words: wordCount(needText(V, "prefix")) + wordCount(needText(V, "suffix")) + wordCount(needText(V, "label")) + 1,
+          };
+        }
+
+        function minSlot(V, tok) {
+          return neededOf(planInput(V, tok));
+        }
+
+        // When everything happens in a slot of p.duration seconds: the count takes as long as the slot allows,
+        // between the cinematic minimum and maximum, and the slot must also hold the reading time and the fade out.
+        function countPlan(p) {
+          var needed = neededOf(p);
+          if (!Number.isFinite(p.duration) || !(p.duration + 1e-6 >= needed)) {
+            throw new Error(
+              "counter: durationSeconds " + p.duration + " is shorter than the " + needed.toFixed(2) +
+                " s it needs (arrival, a count of at least " + p.cinMin + " s, the unit and label, reading time, fade out)",
+            );
+          }
+          var ph = phases(p);
+          var count = Math.min(p.cinMax, p.duration - ph.rest);
+          var landAt = ph.countAt + count;
+          return {
+            countAt: ph.countAt,
+            count: count,
+            landAt: landAt,
+            labelAt: landAt + p.stagger,
+            holdFrom: landAt + ph.arrival,
+            exitAt: p.duration - p.exit,
+          };
+        }
+
+        function figureEm(text) {
+          var em = 0;
+          for (var i = 0; i < text.length; i += 1) {
+            em += FIGURE_EM[text[i]] === undefined ? DIGIT_EM : FIGURE_EM[text[i]];
+          }
+          return em;
+        }
+
+        // The start and the target are both shown; the wider of the two sizes the figure and the ghost, so a
+        // count-down does not outgrow its box.
+        function widestText(s) {
+          var a = formatValue(s.from, s.decimals, s.thousands);
+          var b = formatValue(s.to, s.decimals, s.thousands);
+          return figureEm(a) > figureEm(b) ? a : b;
+        }
+
+        // The largest figure size, whole pixels, at which the widest shown text plus its prefix and unit fit the width.
+        function figureSize(p) {
+          var affixPx = (p.prefix.length + p.suffix.length) * AFFIX_EM * p.affixSize;
+          var gapPx = ((p.prefix ? PREFIX_GAP_EM : 0) + (p.suffix ? SUFFIX_GAP_EM : 0)) * p.affixSize;
+          var size = Math.floor(Math.min(p.max, (p.available - affixPx - gapPx) / figureEm(p.text)));
+          if (size < p.min) {
+            throw new Error(
+              'counter: "' + p.prefix + p.text + p.suffix + '" does not fit the width at the minimum figure size of ' +
+                p.min + " px: shorten the unit or the number",
+            );
+          }
+          return size;
+        }
+
+        // The count: a proxy object tweened from the start to the target, its value shown as text on every render of
+        // the tween. The hook is a GSAP modifier, not onUpdate: onUpdate is a callback, and a seek that suppresses
+        // callbacks (the runtime's quiet seek, a scrub) that jumps past the end of the tween would leave the last
+        // frame's text on screen, a few units short of the target. A modifier is part of the property render, so it
+        // runs on every render, quiet or not, in either direction. The shown text is a function of the proxy only;
+        // the clamp makes both ends exact (no float noise from the interpolation).
+        function addCount(tl, s, onText) {
+          var proxy = { value: s.from };
+          var low = Math.min(s.from, s.to);
+          var high = Math.max(s.from, s.to);
+          function show(v) {
+            onText(formatValue(Math.min(Math.max(v, low), high), s.decimals, s.thousands));
+            return v;
+          }
+          onText(formatValue(s.from, s.decimals, s.thousands));
+          tl.fromTo(
+            proxy,
+            { value: s.from },
+            { value: s.to, duration: s.duration, ease: s.ease, modifiers: { value: show } },
+            s.at,
+          );
+        }
+        // logic:end
+
+        // The idiom of the other blocks: the declared defaults first, then what HyperFrames resolved for this
+        // composition (declared defaults plus the mount's overrides). A mounted composition's <html> is not in
+        // the page, so there the second step carries the defaults.
+        function readVars() {
+          var out = {};
+          var raw = document.documentElement.getAttribute("data-composition-variables");
+          if (raw) {
+            JSON.parse(raw).forEach(function (d) {
+              out[d.id] = d.default;
+            });
+          }
+          var hf = window.__hyperframes;
+          var overrides =
+            hf && typeof hf.getVariables === "function" ? hf.getVariables() : window.__hfVariables;
+          if (overrides && typeof overrides === "object") {
+            for (var key in overrides) if (overrides[key] !== undefined) out[key] = overrides[key];
+          }
+          return out;
+        }
+
+        var V = readVars();
+
+        // No literal fallbacks: a missing or wrong variable fails the render rather than drawing a wrong frame.
+        function needNumber(name) {
+          var n = V[name];
+          if (typeof n !== "number" || !Number.isFinite(n) || Math.abs(n) >= 1e15) {
+            throw new Error("counter: the " + name + " variable is missing or is not a number under 1e15");
+          }
+          return n;
+        }
+        var from = needNumber("from");
+        var to = needNumber("to");
+        var decimals = needNumber("decimals");
+        if (!Number.isInteger(decimals) || decimals < 0 || decimals > 4) {
+          throw new Error("counter: decimals must be a whole number from 0 to 4");
+        }
+        var prefix = needText(V, "prefix");
+        var suffix = needText(V, "suffix");
+        var label = needText(V, "label");
+        if (typeof V.thousandsSeparator !== "boolean") {
+          throw new Error("counter: the thousandsSeparator variable is missing or is not true or false");
+        }
+        var thousands = V.thousandsSeparator;
+
+        var rootEl = document.querySelector("#counter-root");
+        var stageEl = rootEl.querySelector(".stage");
+        var scrimEl = rootEl.querySelector(".scrim");
+        var groupEl = rootEl.querySelector(".group");
+        var figureEl = rootEl.querySelector(".figure");
+        var prefixEl = rootEl.querySelector(".prefix");
+        var suffixEl = rootEl.querySelector(".suffix");
+        var ghostEl = rootEl.querySelector(".ghost");
+        var liveEl = rootEl.querySelector(".live");
+        var labelEl = rootEl.querySelector(".label");
+
+        function token(name) {
+          var value = getComputedStyle(rootEl).getPropertyValue(name).trim();
+          if (!value) throw new Error("tokens.css is not loaded: " + name + " is empty");
+          return value;
+        }
+        function number(name) {
+          return Number.parseFloat(token(name));
+        }
+        var enter = number("--dur-enter");
+        var exit = number("--dur-exit");
+        var titleSize = number("--size-title");
+        var FIGURE_SCALE = 2.5; // the figure is two and a half times the title size, when the width allows
+
+        var widest = widestText({ from: from, to: to, decimals: decimals, thousands: thousands });
+        var size = figureSize({
+          text: widest,
+          prefix: prefix,
+          suffix: suffix,
+          affixSize: titleSize,
+          available:
+            Number.parseFloat(rootEl.getAttribute("data-width")) - number("--safe-left") - number("--safe-right"),
+          max: titleSize * FIGURE_SCALE,
+          min: titleSize,
+        });
+        rootEl.style.setProperty("--figure-size", size + "px");
+
+        prefixEl.textContent = prefix;
+        suffixEl.textContent = suffix;
+        labelEl.textContent = label;
+        ghostEl.textContent = widest;
+
+        var duration = Number.parseFloat(V.durationSeconds);
+        var planParams = planInput(V, number);
+        planParams.duration = duration;
+        var plan = countPlan(planParams);
+
+        var tl = gsap.timeline({ paused: true });
+
+        // The figure arrives on the scrim; the count starts while it is still easing in.
+        tl.fromTo(scrimEl, { opacity: 0 }, { opacity: 1, duration: enter, ease: token("--ease-enter") }, 0);
+        tl.fromTo(
+          groupEl,
+          { opacity: 0, y: 24 },
+          { opacity: 1, y: 0, duration: enter, ease: token("--ease-enter") },
+          0,
+        );
+        addCount(
+          tl,
+          {
+            from: from,
+            to: to,
+            decimals: decimals,
+            thousands: thousands,
+            at: plan.countAt,
+            duration: plan.count,
+            ease: token("--ease-emphasis"),
+          },
+          function (text) {
+            liveEl.textContent = text;
+          },
+        );
+        // The settle: a small scale that ends on 1 with the count, so the figure lands without any overshoot.
+        tl.fromTo(
+          figureEl,
+          { scale: 0.97 },
+          { scale: 1, duration: plan.count, ease: token("--ease-emphasis") },
+          plan.countAt,
+        );
+        // The unit and the label arrive after the count lands, one line after the other.
+        tl.fromTo(
+          suffixEl,
+          { opacity: 0, x: -16 },
+          { opacity: 1, x: 0, duration: enter, ease: token("--ease-enter") },
+          plan.landAt,
+        );
+        tl.fromTo(
+          labelEl,
+          { opacity: 0, y: 16 },
+          { opacity: 1, y: 0, duration: enter, ease: token("--ease-enter") },
+          plan.labelAt,
+        );
+        // The slot ends with the fade out.
+        tl.fromTo(
+          stageEl,
+          { opacity: 1 },
+          { opacity: 0, duration: exit, ease: token("--ease-exit"), immediateRender: false },
+          duration - exit,
+        );
+
+        window.__timelines = window.__timelines || {};
+        window.__timelines["counter"] = tl;
+      })();
+    </script>
+  </body>
+</html>

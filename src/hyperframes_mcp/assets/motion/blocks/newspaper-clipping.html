@@ -1,0 +1,587 @@
+<!--
+  Copyright 2026 the hyperframes-mcp contributors. Written for the motion library (src/hyperframes_mcp/motion) after studying three
+  upstream pieces, none of which is copied line for line:
+    - torn-paper-rip (heygen-com/hyperframes, Apache-2.0, https://github.com/heygen-com/hyperframes, commit
+      568dc2ae5bbc0fc7f3acce5b3f6e745f7b1c670c): the idea of one seeded edge table made once (a linear congruential
+      generator, a smooth value noise for the slow wander plus a per-vertex fibre jitter) and a lighter paper-core
+      band that rides the torn edge. Here the generator is a seeded mulberry32 and the edge is static.
+    - freeze-frame-dressing (same repository and commit): translucent tape strips on a sheet.
+    - t1-section-tornstrip and t1-section-classified (nateherkai/hyperframes-student-kit, MIT,
+      https://github.com/nateherkai/hyperframes-student-kit, commit 0d30152a82b9ceb93cfdd9bdbf46f0d5ab3cde86): a title
+      on a torn paper strip with a clip-path polygon edge, taped paper cards.
+  Everything else is rewritten to the component contract in docs/motion-library.md: tokens only, a
+  seeded generator, no shadows, no bounce, fromTo on one paused timeline.
+
+  A newspaper clipping laid on the night ground, the signature device of the look: a paper cutout with irregular torn
+  edges, a fixed slight tilt and two strips of tape, carrying a source line, a dateline, a headline, a short body
+  and, optionally, a halftone photograph. A highlight (a substring of the headline or body) is drawn over it with a
+  marker, left to right, in a multiply blend.
+
+  PROVENANCE RULE. A clipping is only ever a real archival document, so sourceLabel is required: the block throws
+  without it and draws it on the clipping, first line. The defaults are neutral words marked SAMPLE so that a
+  default render can never be mistaken for a real clipping; no masthead is ever invented.
+
+  Layout depends on the fonts, which are not loaded when the script first runs, so the timeline is built once the
+  fonts are in and registered then (the async-setup contract of HyperFrames). A text that does not fit the safe
+  zone throws and registers nothing.
+-->
+<!doctype html>
+<html
+  lang="en"
+  data-composition-variables='[
+    {"id":"durationSeconds","type":"number","label":"Seconds on screen, entrance and exit included","default":11,"min":2.4,"max":30,"step":0.1,"unit":"s"},
+    {"id":"sourceLabel","type":"string","label":"Provenance: where the real document comes from (required)","default":"Sample newspaper, SAMPLE archive","maxLength":110},
+    {"id":"dateline","type":"string","label":"Dateline in the clipping","default":"SAMPLE CITY, SAMPLE DATE","maxLength":60},
+    {"id":"headline","type":"string","label":"Headline","default":"SAMPLE: the headline of a clipping","maxLength":110},
+    {"id":"body","type":"string","label":"Body text, about 60 words at most","default":"SAMPLE TEXT. This is neutral placeholder copy for a newspaper clipping, not a real document. The real body is the archival text of the story.","maxLength":420},
+    {"id":"image","type":"string","label":"Photo, a path inside the project (optional, shown as a halftone)","default":"","placeholder":"projects/TOPIC/photo.jpg","maxLength":200},
+    {"id":"highlight","type":"string","label":"Words of the headline or body to mark (optional)","default":"","maxLength":80},
+    {"id":"edgeSeed","type":"number","label":"Seed of the torn edge","default":7,"min":0,"max":9999,"step":1},
+    {"id":"side","type":"enum","label":"Side of the frame","default":"center","options":[{"value":"left","label":"Left"},{"value":"center","label":"Centre"},{"value":"right","label":"Right"}]}
+  ]'
+>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <title>Newspaper clipping</title>
+    <link rel="stylesheet" href="tokens.css" />
+    <script src="vendor/gsap.min.js"></script>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        width: 1920px;
+        height: 1080px;
+        overflow: hidden;
+        background: transparent;
+      }
+      #clip-root {
+        --clip-reach: 72px;
+        position: relative;
+        width: 1920px;
+        height: 1080px;
+        overflow: hidden;
+      }
+      /* The safe zone, pulled in by the reach of the tape (about 40 px), the tilt and the push-in, so even a
+         clipping as tall as the stage keeps everything inside the safe zone. */
+      #clip-root .stage {
+        position: absolute;
+        top: calc(var(--safe-top) + var(--clip-reach));
+        right: calc(var(--safe-right) + var(--clip-reach));
+        bottom: calc(var(--safe-bottom) + var(--clip-reach));
+        left: calc(var(--safe-left) + var(--clip-reach));
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      #clip-root .stage[data-side="left"] {
+        justify-content: flex-start;
+      }
+      #clip-root .stage[data-side="right"] {
+        justify-content: flex-end;
+      }
+      /* A clipping is cut to its text: as wide as the text wants, between a floor and 1240 px. */
+      #clip-root .clipping {
+        position: relative;
+        flex: none;
+        width: fit-content;
+        min-width: 760px;
+        max-width: 1240px;
+        opacity: 0;
+      }
+      #clip-root .clipping[data-photo="yes"] {
+        width: 1560px;
+        max-width: none;
+      }
+      /* The torn edge: a lighter paper-core band, then the printed face, both clipped by seeded polygons. */
+      #clip-root .rim,
+      #clip-root .face {
+        position: absolute;
+        inset: 0;
+      }
+      #clip-root .rim {
+        background: var(--color-paper);
+      }
+      #clip-root .face {
+        background: color-mix(in srgb, var(--color-paper) 80%, var(--color-paper-aged));
+      }
+      #clip-root .sheet {
+        position: relative;
+        padding: 44px 64px 48px;
+        color: var(--color-ink);
+      }
+      #clip-root .source {
+        padding-bottom: 12px;
+        border-bottom: 6px double color-mix(in srgb, var(--color-ink) 72%, transparent);
+        font-family: var(--font-label);
+        font-weight: 600;
+        font-size: var(--size-credit);
+        line-height: 1.2;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+      #clip-root .dateline {
+        margin-top: 16px;
+        font-family: var(--font-label);
+        font-weight: 600;
+        font-size: var(--size-min-text);
+        line-height: 1.15;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--color-oxblood);
+      }
+      #clip-root .headline {
+        margin-top: 12px;
+        font-family: var(--font-display);
+        font-weight: 700;
+        line-height: 1.02;
+        letter-spacing: -0.01em;
+        text-wrap: balance;
+      }
+      #clip-root .source + .headline {
+        margin-top: 18px;
+      }
+      #clip-root .headline[data-size="large"] {
+        font-size: var(--size-title);
+      }
+      #clip-root .headline[data-size="medium"] {
+        font-size: var(--size-subtitle);
+        line-height: 1.06;
+      }
+      #clip-root .lower {
+        display: flex;
+        align-items: stretch;
+        gap: 44px;
+        margin-top: 18px;
+      }
+      #clip-root .photo {
+        position: relative;
+        flex: none;
+        width: 520px;
+        min-height: 380px;
+        border: 4px solid var(--color-ink);
+        background: var(--color-paper);
+        mix-blend-mode: multiply;
+        overflow: hidden;
+      }
+      /* The halftone is pure black dots on white: lighten raises the black to the ink colour, leaves the white. */
+      #clip-root .photo::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: var(--color-ink);
+        mix-blend-mode: lighten;
+      }
+      #clip-root .photo img {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        object-position: 50% 30%;
+      }
+      #clip-root .body {
+        flex: 1;
+        font-family: var(--font-label);
+        font-weight: 500;
+        font-size: var(--size-min-text);
+        line-height: 1.26;
+        text-wrap: pretty;
+      }
+      /* The marker: one box behind every word, so a highlight that wraps to a second line still draws left to right. */
+      #clip-root .mw {
+        position: relative;
+        display: inline-block;
+      }
+      #clip-root .mb {
+        position: absolute;
+        top: 8%;
+        right: 0;
+        bottom: 6%;
+        left: 0;
+        background: var(--color-gold);
+        mix-blend-mode: multiply;
+        transform-origin: 0% 50%;
+      }
+      /* Tape: the strip is tweened, the wrapper only holds the fixed tilt. Each strip sticks out of the paper by
+         about 40 px, which the reach of the stage accounts for. */
+      #clip-root .tape {
+        position: absolute;
+        width: 170px;
+        height: 48px;
+      }
+      #clip-root .tape-a {
+        top: 6px;
+        left: -40px;
+        transform: rotate(-39deg);
+      }
+      #clip-root .tape-b {
+        right: -40px;
+        bottom: 6px;
+        transform: rotate(-36deg);
+      }
+      #clip-root .tape-strip {
+        width: 100%;
+        height: 100%;
+        background: color-mix(in srgb, var(--color-paper-aged) 66%, transparent);
+        clip-path: polygon(
+          0% 0%, 3% 12%, 0% 25%, 3% 37%, 0% 50%, 3% 62%, 0% 75%, 3% 87%, 0% 100%,
+          100% 100%, 97% 87%, 100% 75%, 97% 62%, 100% 50%, 97% 37%, 100% 25%, 97% 12%, 100% 0%
+        );
+      }
+    </style>
+  </head>
+  <body>
+    <div
+      id="clip-root"
+      data-composition-id="newspaper-clipping"
+      data-width="1920"
+      data-height="1080"
+      data-start="0"
+      data-duration="11"
+    >
+      <div class="stage">
+        <div class="clipping">
+          <div class="rim"></div>
+          <div class="face"></div>
+          <div class="sheet">
+            <p class="source"></p>
+            <p class="dateline"></p>
+            <h1 class="headline"></h1>
+            <div class="lower">
+              <figure class="photo"><img alt="" /></figure>
+              <p class="body"></p>
+            </div>
+          </div>
+          <div class="tape tape-a"><div class="tape-strip"></div></div>
+          <div class="tape tape-b"><div class="tape-strip"></div></div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      (function () {
+        "use strict";
+
+        // The idiom of the other blocks: the declared defaults first, then what HyperFrames resolved for this
+        // composition (declared defaults plus the mount's overrides).
+        function readVars() {
+          var out = {};
+          var raw = document.documentElement.getAttribute("data-composition-variables");
+          if (raw) {
+            JSON.parse(raw).forEach(function (d) {
+              out[d.id] = d.default;
+            });
+          }
+          var hf = window.__hyperframes;
+          var overrides =
+            hf && typeof hf.getVariables === "function" ? hf.getVariables() : window.__hfVariables;
+          if (overrides && typeof overrides === "object") {
+            for (var key in overrides) if (overrides[key] !== undefined) out[key] = overrides[key];
+          }
+          return out;
+        }
+
+        var V = readVars();
+
+        // No literal fallbacks: a missing or empty required variable fails the render, never a wrong frame.
+        function required(name) {
+          if (typeof V[name] !== "string" || V[name].trim().length === 0) {
+            throw new Error("newspaper-clipping: the " + name + " variable is missing or empty");
+          }
+          return V[name].trim();
+        }
+        function optional(name) {
+          if (typeof V[name] !== "string") {
+            throw new Error("newspaper-clipping: the " + name + " variable must be a string");
+          }
+          return V[name].trim();
+        }
+        var sourceLabel = required("sourceLabel"); // provenance: the clipping is only ever a real document
+        var headline = required("headline");
+        var dateline = optional("dateline");
+        var body = optional("body");
+        var highlight = optional("highlight");
+        var image = optional("image");
+        var edgeSeed = Number(V.edgeSeed);
+        if (!Number.isInteger(edgeSeed) || edgeSeed < 0) {
+          throw new Error("newspaper-clipping: edgeSeed must be a whole number, 0 or more");
+        }
+        if (V.side !== "left" && V.side !== "center" && V.side !== "right") {
+          throw new Error("newspaper-clipping: side must be left, center or right");
+        }
+        // A photo is a file of the project: never an address, an absolute path or a path that leaves the project.
+        if (image && (/^[A-Za-z][A-Za-z0-9+.-]*:/.test(image) || /^[\\/]/.test(image) || image.indexOf("..") >= 0)) {
+          throw new Error("newspaper-clipping: image must be a path inside the project, got " + image);
+        }
+
+        var stage = document.querySelector(".stage");
+        var clipping = document.querySelector(".clipping");
+        var sourceEl = document.querySelector(".source");
+        var datelineEl = document.querySelector(".dateline");
+        var headlineEl = document.querySelector(".headline");
+        var bodyEl = document.querySelector(".body");
+        var photoEl = document.querySelector(".photo");
+        var photoImg = photoEl.querySelector("img");
+        var rimEl = document.querySelector(".rim");
+        var faceEl = document.querySelector(".face");
+
+        function token(name) {
+          var value = getComputedStyle(clipping).getPropertyValue(name).trim();
+          if (!value) throw new Error("tokens.css is not loaded: " + name + " is empty");
+          return value;
+        }
+        var enter = Number.parseFloat(token("--dur-enter"));
+        var exit = Number.parseFloat(token("--dur-exit"));
+        var micro = Number.parseFloat(token("--dur-micro"));
+        var readMin = Number.parseFloat(token("--dur-read-min"));
+        var readPerWord = Number.parseFloat(token("--dur-read-per-word"));
+        var staggerTotal = Number.parseFloat(token("--dur-group-stagger-total-max"));
+        var wordStagger = Number.parseFloat(token("--dur-word-stagger"));
+
+        // ---- the text: set through textContent, never as markup ------------------------------------------
+        function words(text) {
+          return text.split(/\s+/).filter(Boolean).length;
+        }
+        function span(text, className) {
+          var node = document.createElement("span");
+          if (className) node.className = className;
+          node.textContent = text;
+          return node;
+        }
+
+        sourceEl.textContent = sourceLabel;
+        if (dateline) datelineEl.textContent = dateline;
+        else datelineEl.remove();
+        headlineEl.setAttribute("data-size", headline.length <= 36 ? "large" : "medium");
+
+        // The highlight: the first match in the headline, else the body, widened to whole words. Each word of it
+        // is a box, so once the fonts are in, the words that share a line get one marker band behind them.
+        var target = null;
+        var markStart = 0;
+        var markEnd = 0;
+        if (highlight) {
+          [[headlineEl, headline], [bodyEl, body]].some(function (part) {
+            var text = part[1];
+            var at = text.indexOf(highlight);
+            if (at < 0) return false;
+            target = part[0];
+            markStart = at;
+            markEnd = at + highlight.length;
+            while (markStart > 0 && !/\s/.test(text[markStart - 1])) markStart -= 1;
+            while (markEnd < text.length && !/\s/.test(text[markEnd])) markEnd += 1;
+            return true;
+          });
+          if (!target) {
+            throw new Error("newspaper-clipping: the highlight " + JSON.stringify(highlight) + " is in neither the headline nor the body");
+          }
+        }
+        function fill(node, text) {
+          if (node !== target) {
+            node.textContent = text;
+            return;
+          }
+          node.textContent = "";
+          node.appendChild(span(text.slice(0, markStart)));
+          var run = text.slice(markStart, markEnd).split(/\s+/);
+          run.forEach(function (word, i) {
+            if (i > 0) node.appendChild(span(" "));
+            var box = span("", "mw");
+            box.appendChild(span(word));
+            node.appendChild(box);
+          });
+          node.appendChild(span(text.slice(markEnd)));
+        }
+        fill(headlineEl, headline);
+        if (body) fill(bodyEl, body);
+        else bodyEl.remove();
+
+        // ---- the photo: a halftone made by the renderer's per-element grading, on a real <img> -------------
+        if (image) {
+          clipping.setAttribute("data-photo", "yes");
+          photoImg.setAttribute(
+            "data-color-grading",
+            '{"effects":{"monoScreen":1,"monoScreenSize":0.3,"monoScreenAngle":0.25,"monoScreenSpread":0.3,"monoScreenShape":0,"monoScreenInvert":0}}',
+          );
+          photoImg.setAttribute("src", image);
+        } else {
+          photoEl.remove();
+        }
+        if (!image && !body) document.querySelector(".lower").remove();
+
+        stage.setAttribute("data-side", V.side);
+
+        // ---- the torn edge: a seeded generator, so a seed always gives the same clipping -------------------
+        function mulberry32(seed) {
+          var a = seed >>> 0;
+          return function () {
+            a = (a + 0x6d2b79f5) | 0;
+            var t = Math.imul(a ^ (a >>> 15), 1 | a);
+            t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+            return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+          };
+        }
+        function smoothNoise(rand, knots) {
+          var k = [];
+          for (var i = 0; i <= knots; i += 1) k.push(rand());
+          return function (v) {
+            var f = v * knots;
+            var i = Math.min(knots - 1, Math.floor(f));
+            var u = f - i;
+            u = u * u * (3 - 2 * u);
+            return k[i] + (k[i + 1] - k[i]) * u;
+          };
+        }
+        // One edge: how far (px) the rim's outer boundary and the printed face's boundary sit inside the box, at
+        // n + 1 points along the edge. A slow wander, a fibre jitter at every point and now and then a small bite.
+        function tornEdge(rand, n, knots) {
+          var wander = smoothNoise(rand, knots);
+          var band = smoothNoise(rand, knots + 3);
+          var outer = [];
+          var face = [];
+          for (var i = 0; i <= n; i += 1) {
+            var v = i / n;
+            var bite = rand() < 0.07 ? 3 + rand() * 7 : 0;
+            var out = 2 + 11 * wander(v) + 3 * rand() + bite;
+            outer.push(out);
+            face.push(out + 5 + 6 * band(v) + 2 * rand());
+          }
+          return { outer: outer, face: face };
+        }
+        var NX = 74;
+        var NY = 56;
+        var rand = mulberry32(edgeSeed);
+        var topEdge = tornEdge(rand, NX, 9);
+        var rightEdge = tornEdge(rand, NY, 7);
+        var bottomEdge = tornEdge(rand, NX, 9);
+        var leftEdge = tornEdge(rand, NY, 7);
+        function point(xp, xo, yp, yo) {
+          return "calc(" + xp.toFixed(2) + "% + " + xo.toFixed(1) + "px) calc(" + yp.toFixed(2) + "% + " + yo.toFixed(1) + "px)";
+        }
+        function polygon(kind) {
+          var T = topEdge[kind];
+          var R = rightEdge[kind];
+          var B = bottomEdge[kind];
+          var L = leftEdge[kind];
+          var pts = [point(0, L[0], 0, T[0])];
+          for (var i = 1; i < NX; i += 1) pts.push(point((i / NX) * 100, 0, 0, T[i]));
+          pts.push(point(100, -R[0], 0, T[NX]));
+          for (var j = 1; j < NY; j += 1) pts.push(point(100, -R[j], (j / NY) * 100, 0));
+          pts.push(point(100, -R[NY], 100, -B[NX]));
+          for (var k = NX - 1; k > 0; k -= 1) pts.push(point((k / NX) * 100, 0, 100, -B[k]));
+          pts.push(point(0, L[NY], 100, -B[0]));
+          for (var m = NY - 1; m > 0; m -= 1) pts.push(point(0, L[m], (m / NY) * 100, 0));
+          return "polygon(" + pts.join(", ") + ")";
+        }
+        rimEl.style.clipPath = polygon("outer");
+        faceEl.style.clipPath = polygon("face");
+
+        // ---- the slot: the entrance, the hold (long enough to read) and the exit fill durationSeconds -------
+        var duration = Number.parseFloat(V.durationSeconds);
+        var headlineWords = words(headline);
+        var readSeconds = Math.max(readMin, readPerWord * (headlineWords + words(body)));
+        // The marker draws once the headline can be read, a line after a line; a sweep over however many lines
+        // takes at most the group stagger plus the time of one line.
+        var markDelay = Math.max(readMin, readPerWord * headlineWords);
+        var markEach = enter * 0.7;
+        var holdSeconds = target
+          ? Math.max(readSeconds, markDelay + staggerTotal + markEach + readMin)
+          : readSeconds;
+        var needed = enter + holdSeconds + exit;
+        if (!Number.isFinite(duration) || duration < needed) {
+          throw new Error(
+            "newspaper-clipping: durationSeconds " + V.durationSeconds + " is shorter than the " +
+              needed.toFixed(2) + " s it needs (entrance, reading time, exit)",
+          );
+        }
+
+        // Layout needs the fonts: wait until the faces the clipping draws are in, then measure and build.
+        var loads = [sourceEl, datelineEl, headlineEl, bodyEl].filter(function (node) {
+          return node.isConnected;
+        }).map(function (node) {
+          var cs = getComputedStyle(node);
+          return document.fonts.load(
+            cs.fontStyle + " " + cs.fontWeight + " " + cs.fontSize + " " + cs.fontFamily,
+            node.textContent,
+          );
+        });
+        // A photo that cannot be loaded fails the render too: the grading would otherwise draw an empty frame.
+        if (image) loads.push(photoImg.decode());
+
+        Promise.all(loads).then(function () {
+          if (clipping.offsetHeight > stage.clientHeight) {
+            throw new Error(
+              "newspaper-clipping: the text does not fit the safe zone (" + clipping.offsetHeight +
+                " px tall, " + stage.clientHeight + " px available): shorten the headline or the body",
+            );
+          }
+
+          // One marker band per line of the highlight, behind the first word of the line and reaching over the rest
+          // of it, so there is no seam where two boxes meet. The lines are known now that the fonts are in; all
+          // the measuring comes first, then the writing.
+          var lines = [];
+          clipping.querySelectorAll(".mw").forEach(function (box) {
+            var last = lines[lines.length - 1];
+            var right = box.offsetLeft + box.offsetWidth;
+            if (last && last.box.offsetTop === box.offsetTop) last.end = right;
+            else lines.push({ box: box, firstRight: right, end: right });
+          });
+          var marks = lines.map(function (line) {
+            var mark = span("", "mb");
+            mark.style.right = line.firstRight - line.end + "px";
+            line.box.insertBefore(mark, line.box.firstChild);
+            return mark;
+          });
+          var markStep = Math.min(markEach / 2, staggerTotal / Math.max(1, marks.length - 1));
+
+          var angle = -1.2; // the fixed tilt of the paper, degrees
+          var tl = gsap.timeline({ paused: true });
+          // The paper settles: a short rise and the last degree of its tilt, never a bounce.
+          tl.fromTo(
+            clipping,
+            { opacity: 0, y: 20, rotation: angle + 1 },
+            { opacity: 1, y: 0, rotation: angle, duration: enter, ease: token("--ease-enter") },
+            0,
+          );
+          // The tape is pressed on as the paper lands.
+          tl.fromTo(
+            clipping.querySelectorAll(".tape-strip"),
+            { opacity: 0, scale: 1.12 },
+            { opacity: 1, scale: 1, duration: micro, ease: token("--ease-enter"), stagger: wordStagger },
+            enter * 0.6,
+          );
+          // One slow push-in over the hold, a single tween, 3 percent at most.
+          tl.fromTo(
+            clipping,
+            { scale: 1 },
+            { scale: 1.03, duration: duration - enter, ease: "power1.inOut", immediateRender: false },
+            enter,
+          );
+          if (marks.length) {
+            tl.fromTo(
+              marks,
+              { scaleX: 0 },
+              { scaleX: 1, duration: markEach, ease: token("--ease-move"), stagger: markStep },
+              enter + markDelay,
+            );
+          }
+          // A fast exit that ends with the slot.
+          tl.fromTo(
+            clipping,
+            { opacity: 1, y: 0 },
+            { opacity: 0, y: -16, duration: exit, ease: token("--ease-exit"), immediateRender: false },
+            duration - exit,
+          );
+
+          window.__timelines = window.__timelines || {};
+          window.__timelines["newspaper-clipping"] = tl;
+        });
+      })();
+    </script>
+  </body>
+</html>

@@ -1,0 +1,45 @@
+{
+  "responseHeader": {
+    "status": 0
+  },
+  "response": {
+    "numFound": 4,
+    "start": 0,
+    "docs": [
+      {
+        "creator": "Unknown",
+        "date": "1920-01-01T00:00:00Z",
+        "identifier": "cmlpl_000770",
+        "licenseurl": "http://creativecommons.org/publicdomain/mark/1.0/",
+        "rights": "Public Domain. No restrictions on use.",
+        "title": "Mount Tamalpais and Muir Woods Scenic Railway Engine No. 4, at Double Bow Knot, Mount Tamalpais"
+      },
+      {
+        "creator": "Schmidt Litho. Co.",
+        "identifier": "cscrm_001416",
+        "licenseurl": "http://creativecommons.org/publicdomain/mark/1.0/",
+        "rights": "Copyright status unknown. This work may be protected by the U.S. Copyright Law (Title 17, U.S.C.). In addition, its reproduction may be restricted by terms of gift or purchase agreements, donor restrictions, privacy and publicity rights, licensing and trademarks. This work is accessible for purposes of education and research. Transmission or reproduction of works protected by copyright beyond that allowed by fair use requires the written permission of the copyright owners. Works not in the public domain cannot be commercially exploited without permission of the copyright owner. Responsibility for any use rests exclusively with the user. California State Railroad Museum Library & Archives attempted to find rights owners without success but is eager to hear from them so that we may obtain permission, if needed. Upon request to library@example.org, digitized works can be removed from public view if there are rights issues that need to be resolved.",
+        "title": "Gold Bar"
+      },
+      {
+        "collection": [
+          "newarksmittys",
+          "newarkpubliclibrary",
+          "americana"
+        ],
+        "description": "Arthur J. Smith Jr. putting gas in Ford Falcon, part of a publicity campaign for Standard Oil.",
+        "identifier": "Smittys010",
+        "mediatype": "image",
+        "rights": "Commercial use of images is subject to service fees. We require that all images be credited to The Newark Public Library. Images are available for download in small size / low resolution. For information about reproducing photos or obtaining high resolution tiff files see http://npl.org/copies/.",
+        "title": "Arthur J. Smith Jr and Rev. Cantrell"
+      },
+      {
+        "creator": "HMS Press",
+        "date": "1936-01-01T00:00:00Z",
+        "identifier": "grand-trunk-1936",
+        "licenseurl": "https://creativecommons.org/publicdomain/mark/1.0/",
+        "title": "Grand Trunk Railroad 1936"
+      }
+    ]
+  }
+}

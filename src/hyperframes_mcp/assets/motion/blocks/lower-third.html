@@ -1,0 +1,283 @@
+<!--
+  Copyright 2026 the hyperframes-mcp contributors.
+
+  Adapted from the HyperFrames registry block lt-accent-underline, https://github.com/heygen-com/hyperframes,
+  registry/blocks/lt-accent-underline/lt-accent-underline.html at commit 568dc2ae5bbc0fc7f3acce5b3f6e745f7b1c670c,
+  Copyright 2026 HeyGen, Inc., licensed under the Apache License, Version 2.0 (the "License"); you may not use that
+  file except in compliance with the License. You may obtain a copy of the License at
+  http://www.apache.org/licenses/LICENSE-2.0. Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
+  either express or implied. See the License for the specific language governing permissions and limitations.
+
+  What is kept from the original: the stack of a name, a drawn rule and a role, and the staggered entrance. What was
+  changed: the text is variables (no hard-coded name), a paper band with a double rule in ink replaces the cardless
+  text shadow, every colour, size, font, duration and ease is a token, the eases do not overshoot, the timeline
+  fills durationSeconds exactly (the original ends with a hard visibility switch), and a slot too short for the
+  entrance, the hold and the exit throws. See assets/motion/THIRD_PARTY.md.
+
+  A name and a role in a bottom corner inside the safe zone: a paper band wipes in with a double rule that draws
+  across it, the name and then the role rise a few pixels, a hold of at least lower_third_hold_min, and the whole
+  band fades out faster than it came in.
+-->
+<!doctype html>
+<html
+  lang="en"
+  data-composition-variables='[
+    {"id":"durationSeconds","type":"number","label":"Seconds on screen, entrance and exit included","default":6,"min":5.7,"max":8,"step":0.1,"unit":"s"},
+    {"id":"name","type":"string","label":"Name","default":"Jay Cooke","maxLength":40},
+    {"id":"role","type":"string","label":"Role and years","default":"Financier, 1821–1905","maxLength":64},
+    {"id":"side","type":"enum","label":"Corner of the frame","default":"left","options":[{"value":"left","label":"Left"},{"value":"right","label":"Right"}]}
+  ]'
+>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <title>Lower third</title>
+    <link rel="stylesheet" href="tokens.css" />
+    <script src="vendor/gsap.min.js"></script>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        width: 1920px;
+        height: 1080px;
+        overflow: hidden;
+        background: transparent;
+      }
+      #lt-root {
+        --lt-width-max: 1200px;
+        --lt-pad-x: 44px;
+        position: relative;
+        width: 1920px;
+        height: 1080px;
+        overflow: hidden;
+        font-variant-numeric: tabular-nums;
+      }
+      #lt-root .lt {
+        position: absolute;
+        left: var(--safe-left);
+        bottom: var(--safe-bottom);
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        max-width: var(--lt-width-max);
+        padding: 46px var(--lt-pad-x) 30px;
+      }
+      #lt-root .lt[data-side="right"] {
+        left: auto;
+        right: var(--safe-right);
+        align-items: flex-end;
+        text-align: right;
+      }
+      #lt-root .lt-paper {
+        position: absolute;
+        inset: 0;
+        background: color-mix(in srgb, var(--color-paper) 92%, transparent);
+      }
+      #lt-root .lt-rules {
+        position: absolute;
+        top: 18px;
+        left: var(--lt-pad-x);
+        right: var(--lt-pad-x);
+        height: 11px;
+        border-top: 4px solid var(--color-ink);
+        border-bottom: 2px solid var(--color-ink);
+        transform-origin: 0% 50%;
+      }
+      #lt-root .lt[data-side="right"] .lt-rules {
+        transform-origin: 100% 50%;
+      }
+      #lt-root .lt-name {
+        position: relative;
+        font-family: var(--font-display);
+        font-weight: 600;
+        font-size: var(--size-subtitle);
+        line-height: 1.1;
+        color: var(--color-ink);
+        opacity: 0;
+      }
+      #lt-root .lt-role {
+        position: relative;
+        font-family: var(--font-label);
+        font-weight: 500;
+        font-size: var(--size-label);
+        line-height: 1.2;
+        letter-spacing: 0.02em;
+        color: var(--color-oxblood);
+        opacity: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <div
+      id="lt-root"
+      data-composition-id="lower-third"
+      data-width="1920"
+      data-height="1080"
+      data-start="0"
+      data-duration="6"
+    >
+      <div class="lt" data-side="left">
+        <div class="lt-paper"></div>
+        <div class="lt-rules"></div>
+        <p class="lt-name"></p>
+        <p class="lt-role"></p>
+      </div>
+    </div>
+
+    <script>
+      (function () {
+        "use strict";
+
+        // logic:begin
+        // The arithmetic of the slot, with no DOM in it. The page runs it for real, and the composer's preflight
+        // (src/hyperframes_mcp/motion/preflight.py) runs the same text in Node, so a shot list is refused before a render can fail.
+
+        // The longest text the band holds on two lines inside the safe zone (the same numbers as maxLength above).
+        var MAX_NAME = 40;
+        var MAX_ROLE = 64;
+
+        // No literal fallbacks: a missing variable fails the render rather than drawing a wrong frame.
+        function line(V, id, max) {
+          var value = V[id];
+          if (typeof value !== "string" || value.trim().length === 0) {
+            throw new Error("lower-third: the " + id + " variable is missing or empty");
+          }
+          value = value.trim();
+          if (value.length > max) {
+            throw new Error("lower-third: " + id + " is " + value.length + " characters, the band holds " + max);
+          }
+          return value;
+        }
+
+        // When the text arrives and the shortest slot. Lines come in half the group stagger total apart (0.25 s):
+        // the name after the band, the role after the name. Never off screen before it can be read: the hold is the
+        // longest of the token minimum for a lower third and the reading time of its words, so a slot too short for
+        // entrance, hold and exit fails the render. tok(name) is the number of a token custom property.
+        function timing(V, tok) {
+          var enter = tok("--dur-enter");
+          var exit = tok("--dur-exit");
+          var lineGap = tok("--dur-group-stagger-total-max") / 2;
+          var nameAt = lineGap;
+          var roleAt = 2 * lineGap;
+          var entranceEnd = roleAt + enter;
+          var words = (line(V, "name", MAX_NAME) + " " + line(V, "role", MAX_ROLE)).split(/\s+/).length;
+          var hold = Math.max(
+            tok("--dur-lower-third-hold-min"),
+            tok("--dur-read-min"),
+            tok("--dur-read-per-word") * words,
+          );
+          return { enter: enter, exit: exit, nameAt: nameAt, roleAt: roleAt, needed: entranceEnd + hold + exit };
+        }
+
+        function minSlot(V, tok) {
+          return timing(V, tok).needed;
+        }
+        // logic:end
+
+        // The idiom of the other blocks: the declared defaults first, then what HyperFrames resolved for this
+        // composition (declared defaults plus the mount's overrides). A mounted composition's <html> is not in
+        // the page, so there the second step carries the defaults.
+        function readVars() {
+          var out = {};
+          var raw = document.documentElement.getAttribute("data-composition-variables");
+          if (raw) {
+            JSON.parse(raw).forEach(function (d) {
+              out[d.id] = d.default;
+            });
+          }
+          var hf = window.__hyperframes;
+          var overrides =
+            hf && typeof hf.getVariables === "function" ? hf.getVariables() : window.__hfVariables;
+          if (overrides && typeof overrides === "object") {
+            for (var key in overrides) if (overrides[key] !== undefined) out[key] = overrides[key];
+          }
+          return out;
+        }
+
+        // Entrance travel in px: under the 24 px of the motion rules.
+        var RISE = 16;
+
+        var V = readVars();
+        var name = line(V, "name", MAX_NAME);
+        var role = line(V, "role", MAX_ROLE);
+        if (V.side !== "left" && V.side !== "right") {
+          throw new Error('lower-third: side must be "left" or "right"');
+        }
+
+        var rootEl = document.querySelector(".lt");
+        var paperEl = document.querySelector(".lt-paper");
+        var rulesEl = document.querySelector(".lt-rules");
+        var nameEl = document.querySelector(".lt-name");
+        var roleEl = document.querySelector(".lt-role");
+        rootEl.setAttribute("data-side", V.side);
+        nameEl.textContent = name;
+        roleEl.textContent = role;
+
+        function token(property) {
+          var value = getComputedStyle(rootEl).getPropertyValue(property).trim();
+          if (!value) throw new Error("tokens.css is not loaded: " + property + " is empty");
+          return value;
+        }
+        function seconds(property) {
+          return Number.parseFloat(token(property));
+        }
+        var when = timing(V, seconds);
+        var enter = when.enter;
+        var exit = when.exit;
+        var nameAt = when.nameAt;
+        var roleAt = when.roleAt;
+        var duration = Number.parseFloat(V.durationSeconds);
+        var needed = when.needed;
+        if (!Number.isFinite(duration) || duration + 1e-6 < needed) {
+          throw new Error(
+            "lower-third: durationSeconds " + V.durationSeconds + " is shorter than the " +
+              needed.toFixed(2) + " s it needs (entrance, hold, exit)",
+          );
+        }
+
+        var enterEase = token("--ease-enter");
+        var tl = gsap.timeline({ paused: true });
+        // The band wipes in from its corner's edge and the double rule draws the same way, on the same ease.
+        tl.fromTo(
+          paperEl,
+          { clipPath: V.side === "left" ? "inset(0% 100% 0% 0%)" : "inset(0% 0% 0% 100%)" },
+          { clipPath: "inset(0% 0% 0% 0%)", duration: enter, ease: enterEase },
+          0,
+        );
+        tl.fromTo(
+          rulesEl,
+          { scaleX: 0 },
+          { scaleX: 1, duration: enter, ease: enterEase },
+          0,
+        );
+        tl.fromTo(
+          nameEl,
+          { opacity: 0, y: RISE },
+          { opacity: 1, y: 0, duration: enter, ease: enterEase },
+          nameAt,
+        );
+        tl.fromTo(
+          roleEl,
+          { opacity: 0, y: RISE },
+          { opacity: 1, y: 0, duration: enter, ease: enterEase },
+          roleAt,
+        );
+        // The exit is a fade of the whole band, faster than the entrance, ending with the slot.
+        tl.fromTo(
+          rootEl,
+          { opacity: 1 },
+          { opacity: 0, duration: exit, ease: token("--ease-exit"), immediateRender: false },
+          duration - exit,
+        );
+
+        window.__timelines = window.__timelines || {};
+        window.__timelines["lower-third"] = tl;
+      })();
+    </script>
+  </body>
+</html>

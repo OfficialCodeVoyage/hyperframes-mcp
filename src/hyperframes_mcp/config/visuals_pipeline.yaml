@@ -1,0 +1,25 @@
+# Settings of the review renders. A copy at ~/.hyperframes-mcp/config/visuals_pipeline.yaml replaces it.
+animated_scene:
+  # Review renders (stills and clips made by the pinned HyperFrames CLI). They run only when node, the CLI
+  # (`hyperframes-mcp setup`) and a local chrome-headless-shell are installed here.
+  enabled: true
+
+  # Clip length when the cue's beat slot is not known, and the bounds of any clip.
+  default_scene_seconds: 8
+  min_scene_seconds: 4
+  max_scene_seconds: 20
+
+  # A render is killed after max(floor, factor x clip length) seconds (measured: 0.8 to 0.96x real time).
+  render_timeout_factor: 6
+  render_timeout_floor_s: 60
+
+  # A clip larger than this is rejected.
+  max_output_mb: 40
+
+  # Parallel Chrome capture workers per render (about 256 MB each), and how many renders may run at once.
+  workers: 2
+  max_parallel_renders: 1
+
+  # auto: run the render under a no-network sandbox where the OS has one (macOS sandbox-exec), else
+  # with the environment hardening only. require: unavailable without the sandbox. off: hardening only.
+  network_isolation: auto

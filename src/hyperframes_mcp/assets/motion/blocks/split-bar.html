@@ -1,0 +1,784 @@
+<!--
+  Copyright 2026 the hyperframes-mcp contributors. Hand-written for the motion library (src/hyperframes_mcp/motion), to the component
+  contract in docs/motion-library.md. No third-party code.
+
+  One whole, split into labelled parts: a single wide bar is the whole (a faint track), the parts grow into it from the
+  left on one scale, each in its tone, and what is left over stays the faint track, unlabelled. Every part has a flag: a
+  pole in its tone from the bar's edge and its label and display, above the bar, or below it when two labels would meet
+  (a part of four percent is about 70 px wide, its label is five times that). A marker is a bracket under the bar on the
+  same scale, with its own label ("the pile sat inside this part"). The whole is named above the bar.
+
+  Everything is positioned from numbers computed between the logic markers (the parts on the scale, the label widths from
+  the advance table of the label face, the rows, the time plan); tests/motion/test_split_bar*.py run them in Node.
+  Parts grow by a clip-path wipe, never by a width tween. Every colour, size, duration and ease comes from tokens.css.
+-->
+<!doctype html>
+<html
+  lang="en"
+  data-composition-variables='[
+    {"id":"durationSeconds","type":"number","label":"Seconds on screen, growth, reading time and fade out included","default":12,"min":3.3,"max":40,"step":0.1,"unit":"s"},
+    {"id":"wholeLabel","type":"string","label":"What the whole bar is, above its left end","default":"The Bundesbank gold ledger","maxLength":34},
+    {"id":"wholeValue","type":"string","label":"Its size as printed, above its right end","default":"about 791 tonnes","maxLength":24},
+    {"id":"parts","type":"string","label":"Parts as JSON, 1 to 6, grown from the left in this order: [{\"label\":\"went abroad\",\"display\":\"about two thirds\",\"value\":503,\"tone\":\"ember\",\"at\":1,\"seconds\":1.2}]. value is the size on the scale of whole; tone is gold, paper, ember or mute; at is the second of the slot when it starts to grow","default":"[{\"label\":\"found in Germany\",\"display\":\"about a third\",\"value\":236,\"tone\":\"gold\",\"at\":1,\"seconds\":1.2},{\"label\":\"went abroad\",\"display\":\"about two thirds\",\"value\":503,\"tone\":\"ember\",\"at\":2.6,\"seconds\":1.6}]"},
+    {"id":"whole","type":"number","label":"The scale: the value of the whole bar. The parts add up to at most this","default":791,"step":1},
+    {"id":"markers","type":"string","label":"Brackets under the bar as JSON, up to 3, or [] for none: [{\"label\":\"the Marburg pile\",\"display\":\"about a quarter of the ledger\",\"from\":0,\"to\":210,\"at\":5}]. from and to are on the scale of whole","default":"[{\"label\":\"the Marburg pile\",\"display\":\"about a quarter of the ledger\",\"from\":0,\"to\":210,\"at\":5}]"},
+    {"id":"note","type":"string","label":"A short line under everything, or empty for none","default":"","maxLength":70}
+  ]'
+>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <title>Split bar</title>
+    <link rel="stylesheet" href="tokens.css" />
+    <script src="vendor/gsap.min.js"></script>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        width: 1920px;
+        height: 1080px;
+        overflow: hidden;
+        background: transparent;
+      }
+      #sb-root {
+        position: relative;
+        width: 1920px;
+        height: 1080px;
+        overflow: hidden;
+      }
+      .sb-stage {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+      }
+      /* A band behind the graphic, the width of the frame and 170 px taller than the graphic at each end, soft at its top
+         and bottom edge (full from 140 px in): the texts read on any shot. */
+      .sb-scrim {
+        position: absolute;
+        top: -170px;
+        bottom: -170px;
+        left: calc(-1 * var(--safe-left));
+        right: calc(-1 * var(--safe-right));
+        opacity: 0;
+        background: linear-gradient(
+          to bottom,
+          transparent 0px,
+          color-mix(in srgb, var(--color-scrim) 12%, transparent) 25px,
+          color-mix(in srgb, var(--color-scrim) 38%, transparent) 55px,
+          color-mix(in srgb, var(--color-scrim) 68%, transparent) 95px,
+          color-mix(in srgb, var(--color-scrim) 88%, transparent) 140px,
+          color-mix(in srgb, var(--color-scrim) 88%, transparent) calc(100% - 140px),
+          color-mix(in srgb, var(--color-scrim) 68%, transparent) calc(100% - 95px),
+          color-mix(in srgb, var(--color-scrim) 38%, transparent) calc(100% - 55px),
+          color-mix(in srgb, var(--color-scrim) 12%, transparent) calc(100% - 25px),
+          transparent 100%
+        );
+      }
+      .sb-stack {
+        position: absolute;
+      }
+      /* The tones: the fill of a part (and its pole) and the colour its display is printed in. */
+      .sb-tone-gold {
+        --tone: var(--color-gold);
+        --tone-text: var(--color-gold);
+      }
+      .sb-tone-paper {
+        --tone: var(--color-paper);
+        --tone-text: var(--color-paper);
+      }
+      .sb-tone-ember {
+        --tone: var(--color-loss);
+        --tone-text: var(--color-loss);
+      }
+      .sb-tone-mute {
+        --tone: color-mix(in srgb, var(--color-paper-aged) 38%, var(--color-night));
+        --tone-text: var(--color-paper-aged);
+      }
+      .sb-head {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        white-space: nowrap;
+        font-family: var(--font-label);
+        font-size: var(--size-body);
+        line-height: 1.2;
+        opacity: 0;
+      }
+      .sb-whole-label {
+        font-weight: 600;
+        color: var(--color-paper);
+      }
+      .sb-whole-value {
+        font-weight: 600;
+        color: var(--color-gold);
+        font-variant-numeric: tabular-nums;
+      }
+      /* The whole: a faint track, so what the parts do not fill is still there, unlabelled. */
+      .sb-track {
+        position: absolute;
+        left: 0;
+        border: 3px solid color-mix(in srgb, var(--color-paper) 40%, transparent);
+        background: color-mix(in srgb, var(--color-paper) 9%, transparent);
+        opacity: 0;
+      }
+      /* A part has its own outline, so the thinnest one is a clear sliver and two parts meet at a line. */
+      .sb-part {
+        position: absolute;
+        border: 3px solid var(--color-paper);
+        background: var(--tone);
+      }
+      .sb-flag,
+      .sb-marker {
+        position: absolute;
+      }
+      /* A pole is drawn in the colour of the display beside it: the muted fill is too dark to be a line on the backing. */
+      .sb-pole {
+        position: absolute;
+        top: 0;
+        background: var(--tone-text);
+      }
+      .sb-flag-text,
+      .sb-marker-text {
+        position: absolute;
+        white-space: nowrap;
+        opacity: 0;
+      }
+      .sb-flag-text.sb-end,
+      .sb-marker-text.sb-end {
+        text-align: right;
+      }
+      .sb-label {
+        font-family: var(--font-label);
+        font-weight: 600;
+        font-size: var(--size-label);
+        line-height: 1.2;
+        color: var(--color-paper);
+      }
+      .sb-display {
+        font-family: var(--font-label);
+        font-weight: 500;
+        font-size: var(--size-label);
+        line-height: 1.2;
+        color: var(--tone-text, var(--color-paper-aged));
+        font-variant-numeric: tabular-nums;
+      }
+      .sb-bracket {
+        position: absolute;
+        top: 0;
+        border: 4px solid var(--color-paper);
+        border-top: none;
+      }
+      .sb-note {
+        position: absolute;
+        left: 0;
+        white-space: nowrap;
+        font-family: var(--font-label);
+        font-weight: 500;
+        font-size: var(--size-min-text);
+        line-height: 1.2;
+        color: var(--color-paper-aged);
+        opacity: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <div
+      id="sb-root"
+      data-composition-id="split-bar"
+      data-width="1920"
+      data-height="1080"
+      data-start="0"
+      data-duration="12"
+    >
+      <div class="sb-stage">
+        <div class="sb-stack">
+          <div class="sb-scrim"></div>
+          <div class="sb-head"><span class="sb-whole-label"></span><span class="sb-whole-value"></span></div>
+          <div class="sb-track"></div>
+          <div class="sb-note"></div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      (function () {
+        "use strict";
+
+        // logic:begin
+        // The arithmetic of the block, with no DOM in it: tests/motion/test_split_bar.py runs these functions in Node, and
+        // the composer's preflight (src/hyperframes_mcp/motion/preflight.py) runs minSlot from this same text.
+
+        var NAME = "split-bar";
+        // The canvas of the tokens (tokens.json, canvas; also the root's data-width and data-height).
+        var CANVAS_W = 1920;
+        var CANVAS_H = 1080;
+        // What the variables may hold (the maxLength values of the declaration above).
+        var MAX_LABEL = 34;
+        var MAX_DISPLAY = 24;
+        var MAX_MARKER_DISPLAY = 34; // a bracket's second line says more ("about a quarter of the ledger")
+        var MAX_NOTE = 70;
+        var MAX_PARTS = 6;
+        var MAX_MARKERS = 3;
+        var TONES = ["gold", "paper", "ember", "mute"];
+        // A part or a bracket narrower than this share of the whole is too thin to draw.
+        var MIN_SHARE = 0.01;
+
+        // Geometry in px. The bar is the safe width; the labels are two lines at the label size.
+        var BAR_H = 120;
+        var HEAD_GAP = 40; // between the heading line and whatever is next
+        var HEAD_MIN_GAP = 48; // least gap between the whole's label and its value
+        var POLE_W = 4;
+        var TEXT_INSET = 18; // between a pole and its text
+        var FLAG_PAD = 16; // between the bar's edge and the nearest edge of a flag's text
+        var FLAG_GAP = 36; // least gap between two labels in one row
+        var MARKER_GAP = 14; // between the bar and the bracket
+        var BRACKET_H = 26;
+        var MARKER_TEXT_GAP = 12;
+        var NOTE_GAP = 40;
+        var LINE_EM = 1.2;
+
+        // The advance of each printable ASCII character from space (32), in thousandths of an em: the widest of
+        // IBM Plex Sans Condensed Medium, SemiBold and Bold, so a text is never wider than this says (kerning only
+        // narrows it). tests/motion/test_split_bar_layout.py checks it against the font files.
+        var ADVANCE = [
+          212, 292, 452, 605, 537, 884, 652, 244, 304, 304, 556, 540, 284, 362, 284, 422, 540, 540, 540, 540, 540, 540, 540,
+          540, 540, 540, 304, 304, 540, 540, 540, 452, 814, 618, 602, 589, 630, 549, 528, 646, 654, 397, 506, 630, 480, 738,
+          654, 642, 595, 642, 610, 556, 527, 630, 598, 884, 612, 579, 546, 302, 422, 302, 540, 505, 540, 516, 550, 468, 550,
+          508, 341, 499, 540, 262, 266, 524, 277, 808, 540, 508, 550, 550, 367, 455, 342, 540, 490, 756, 501, 496, 466, 338,
+          370, 338, 540,
+        ];
+        // The typographic marks the label face has; any other character counts as the widest glyph of Latin-1 and
+        // Latin Extended-A, so an unusual letter only makes the layout more careful.
+        var ADVANCE_OTHER = {
+          "–": 528,
+          "—": 702,
+          "‘": 284,
+          "’": 284,
+          "“": 499,
+          "”": 499,
+          "…": 816,
+        };
+        var ADVANCE_WIDEST = 900;
+
+        function fail(message) {
+          throw new Error(NAME + ": " + message);
+        }
+
+        function wordCount(text) {
+          return text.split(/\s+/).filter(Boolean).length;
+        }
+
+        function textEm(text) {
+          var em = 0;
+          for (var i = 0; i < text.length; i += 1) {
+            var code = text.charCodeAt(i);
+            var thousandths = ADVANCE_WIDEST;
+            if (code >= 32 && code <= 126) thousandths = ADVANCE[code - 32];
+            else if (ADVANCE_OTHER[text[i]] !== undefined) thousandths = ADVANCE_OTHER[text[i]];
+            em += thousandths / 1000;
+          }
+          return em;
+        }
+
+        function textWidth(text, size) {
+          return Math.ceil(textEm(text) * size - 1e-9);
+        }
+
+        // The width of a two-line label: the wider of its two lines.
+        function blockWidth(label, display, size) {
+          return Math.max(textWidth(label, size), textWidth(display, size));
+        }
+
+        // A variable that holds a JSON list: the text is parsed, a list passed by the host is used as it is, empty text
+        // means none.
+        function parseList(raw, name) {
+          if (raw === undefined || raw === null) fail("the " + name + " variable is missing");
+          if (typeof raw !== "string") return raw;
+          var trimmed = raw.trim();
+          if (trimmed === "") return [];
+          try {
+            return JSON.parse(trimmed);
+          } catch (error) {
+            return fail("the " + name + " variable is not valid JSON (" + error.message + ")");
+          }
+        }
+
+        function needText(value, what, max, allowEmpty) {
+          if (typeof value !== "string") fail(what + " is missing or is not text");
+          var text = value.trim();
+          if (text === "" && !allowEmpty) fail(what + " is empty");
+          if (text.length > max) fail(what + " is " + text.length + " characters; at most " + max);
+          return text;
+        }
+
+        function needNumber(value, what) {
+          if (typeof value !== "number" || !Number.isFinite(value)) fail(what + " is missing or is not a number");
+          return value;
+        }
+
+        function needTime(value, what) {
+          var seconds = needNumber(value, what);
+          if (seconds < 0) fail(what + " is negative (" + seconds + " s)");
+          return seconds;
+        }
+
+        function needObject(raw, what, fields) {
+          if (!raw || typeof raw !== "object" || Array.isArray(raw)) fail(what + " must be an object with " + fields);
+        }
+
+        // What the block draws, checked: no literal fallback for a missing field.
+        function readContent(V) {
+          var whole = needNumber(V.whole, "the whole variable");
+          if (whole <= 0) fail("the whole variable must be greater than 0");
+          var rawParts = parseList(V.parts, "parts");
+          if (!Array.isArray(rawParts) || rawParts.length < 1 || rawParts.length > MAX_PARTS) {
+            fail("the parts variable must be a list of 1 to " + MAX_PARTS + " parts");
+          }
+          var sum = 0;
+          var parts = rawParts.map(function (raw, i) {
+            var at = "parts[" + i + "]";
+            needObject(raw, at, "label, display, value, tone, at and seconds");
+            var label = needText(raw.label, at + ".label", MAX_LABEL);
+            var display = needText(raw.display, at + ".display", MAX_DISPLAY);
+            var value = needNumber(raw.value, at + ".value");
+            if (value <= 0) fail(at + ".value must be greater than 0");
+            if (value / whole < MIN_SHARE - 1e-9) {
+              fail(at + " is under " + MIN_SHARE * 100 + " percent of the whole: too thin to draw");
+            }
+            if (TONES.indexOf(raw.tone) < 0) fail(at + '.tone "' + raw.tone + '" is not one of ' + TONES.join(", "));
+            var when = needTime(raw.at, at + ".at");
+            var seconds = needNumber(raw.seconds, at + ".seconds");
+            if (seconds <= 0) fail(at + ".seconds must be greater than 0");
+            sum += value;
+            return { label: label, display: display, value: value, tone: raw.tone, at: when, seconds: seconds };
+          });
+          if (sum > whole * (1 + 1e-9)) {
+            fail("the parts add up to " + sum + ", which is more than the whole variable (" + whole + ")");
+          }
+          var rawMarkers = parseList(V.markers, "markers");
+          if (!Array.isArray(rawMarkers) || rawMarkers.length > MAX_MARKERS) {
+            fail("the markers variable must be a list of up to " + MAX_MARKERS + " markers");
+          }
+          var markers = rawMarkers.map(function (raw, i) {
+            var at = "markers[" + i + "]";
+            needObject(raw, at, "label, display, from, to and at");
+            var label = needText(raw.label, at + ".label", MAX_LABEL);
+            var display = needText(raw.display, at + ".display", MAX_MARKER_DISPLAY);
+            var from = needNumber(raw.from, at + ".from");
+            var to = needNumber(raw.to, at + ".to");
+            if (from < 0) fail(at + ".from is below 0 (" + from + ")");
+            if (to > whole * (1 + 1e-9)) fail(at + ".to (" + to + ") is past the whole (" + whole + ")");
+            if (!(from < to)) fail(at + ".from must be less than " + at + ".to");
+            if ((to - from) / whole < MIN_SHARE - 1e-9) {
+              fail(at + " is under " + MIN_SHARE * 100 + " percent of the whole: too thin to draw");
+            }
+            return { label: label, display: display, from: from, to: to, at: needTime(raw.at, at + ".at") };
+          });
+          return {
+            wholeLabel: needText(V.wholeLabel, "the wholeLabel variable", MAX_LABEL),
+            wholeValue: needText(V.wholeValue, "the wholeValue variable", MAX_DISPLAY),
+            whole: whole,
+            parts: parts,
+            markers: markers,
+            note: needText(V.note, "the note variable", MAX_NOTE, true),
+          };
+        }
+
+        // The geometry input from the tokens: tok(name) is the number of a token custom property.
+        function geometryInput(tok) {
+          return {
+            safeW: CANVAS_W - tok("--safe-left") - tok("--safe-right"),
+            safeH: CANVAS_H - tok("--safe-top") - tok("--safe-bottom"),
+            safeLeft: tok("--safe-left"),
+            safeTop: tok("--safe-top"),
+            label: tok("--size-label"),
+            head: tok("--size-body"),
+            note: tok("--size-min-text"),
+          };
+        }
+
+        // Where everything goes, in px: the bar and the parts on one scale from its left end, the heading, the brackets,
+        // a flag (pole and label) for each part above the bar or, when two labels would meet, below it, the note, and the
+        // whole centred in the safe zone. A label with no free place is an error that names it.
+        function layoutFor(c, g) {
+          var barW = g.safeW;
+          var blockH = 2 * Math.round(LINE_EM * g.label); // a label is two lines
+          function at(value) {
+            return Math.round((value / c.whole) * barW);
+          }
+
+          var headH = Math.round(LINE_EM * g.head);
+          var headNeeds = textWidth(c.wholeLabel, g.head) + textWidth(c.wholeValue, g.head) + HEAD_MIN_GAP;
+          if (headNeeds > barW) {
+            fail("the wholeLabel and wholeValue variables do not fit on one line (" + headNeeds + " px of " + barW + "): shorten them");
+          }
+          var noteH = Math.round(LINE_EM * g.note);
+          if (c.note && textWidth(c.note, g.note) > barW) {
+            fail("the note variable is too wide for one line (" + textWidth(c.note, g.note) + " px of " + barW + "): shorten it");
+          }
+
+          var from = 0;
+          var parts = c.parts.map(function (p) {
+            var x0 = at(from);
+            from += p.value;
+            return { x0: x0, x1: at(from) };
+          });
+
+          // The brackets first: they have one place each, in the lane below the bar. rows holds the stretches of the
+          // two label lanes that are taken, as [left, right].
+          var rows = { up: [], down: [] };
+          function clashes(taken, left, right) {
+            return left < taken[1] + FLAG_GAP && right + FLAG_GAP > taken[0];
+          }
+          function free(row, left, right) {
+            return !rows[row].some(function (taken) {
+              return clashes(taken, left, right);
+            });
+          }
+          var markers = c.markers.map(function (m, i) {
+            var x0 = at(m.from);
+            var x1 = at(m.to);
+            var w = blockWidth(m.label, m.display, g.label);
+            var anchor = x0 + w <= barW ? "start" : "end";
+            var textX = anchor === "start" ? x0 : x1 - w;
+            if (textX < 0) fail("markers[" + i + "]: its text (" + w + " px) fits neither from its left nor to its right end");
+            var left = Math.min(x0, textX);
+            var right = Math.max(x1, textX + w);
+            rows.down.forEach(function (taken, j) {
+              if (clashes(taken, left, right)) {
+                fail("markers[" + i + "] and markers[" + j + "] overlap: leave one of them out or shorten the texts");
+              }
+            });
+            rows.down.push([left, right]);
+            return {
+              x0: x0,
+              x1: x1,
+              anchor: anchor,
+              left: left,
+              right: right,
+              bracketLeft: x0 - left,
+              bracketW: x1 - x0,
+              textLeft: textX - left,
+              textW: w,
+            };
+          });
+
+          // The leftmost place for a flag in a row that is at or after x, clear of what is taken there.
+          function clearOf(row, x, full) {
+            var left = x;
+            var moved = true;
+            while (moved) {
+              moved = false;
+              rows[row].forEach(function (taken) {
+                if (clashes(taken, left, left + full)) {
+                  left = taken[1] + FLAG_GAP;
+                  moved = true;
+                }
+              });
+            }
+            return left;
+          }
+
+          // Then the flags, in order: from the part's left edge above the bar when that is free, else below it, else
+          // standing further along the part's top or bottom edge, else (at the right end of the bar) to its right edge.
+          var flags = parts.map(function (part, i) {
+            var p = c.parts[i];
+            var w = blockWidth(p.label, p.display, g.label);
+            var full = POLE_W + TEXT_INSET + w;
+            var options = [
+              { row: "up", anchor: "start", slide: false },
+              { row: "down", anchor: "start", slide: false },
+              { row: "up", anchor: "start", slide: true },
+              { row: "down", anchor: "start", slide: true },
+              { row: "up", anchor: "end", slide: false },
+              { row: "down", anchor: "end", slide: false },
+            ];
+            for (var k = 0; k < options.length; k += 1) {
+              var o = options[k];
+              var start = o.anchor === "start";
+              var left = !start ? part.x1 - full : o.slide ? clearOf(o.row, part.x0, full) : part.x0;
+              if (left < 0 || left + full > barW || !free(o.row, left, left + full)) continue;
+              if (start && left > part.x1 - POLE_W) continue;
+              rows[o.row].push([left, left + full]);
+              return {
+                row: o.row,
+                anchor: o.anchor,
+                left: left,
+                right: left + full,
+                width: full,
+                poleLeft: start ? left : left + full - POLE_W,
+                poleX: start ? 0 : full - POLE_W,
+                textLeft: start ? POLE_W + TEXT_INSET : 0,
+                textW: w,
+              };
+            }
+            return fail('the label of parts[' + i + '] ("' + p.label + '") has no free place above or below the bar: shorten the texts, merge small parts or leave out a marker');
+          });
+
+          // The lanes are as tall as what uses them.
+          var flagH = FLAG_PAD + blockH;
+          var anyUp = flags.some(function (f) { return f.row === "up"; });
+          var anyDown = flags.some(function (f) { return f.row === "down"; });
+          var upH = anyUp ? flagH : 0;
+          var markerBox = BRACKET_H + MARKER_TEXT_GAP + blockH; // the bracket and its two-line label
+          var downH = Math.max(anyDown ? flagH : 0, markers.length > 0 ? MARKER_GAP + markerBox : 0);
+          var barY = headH + HEAD_GAP + upH;
+          var noteY = barY + BAR_H + downH + NOTE_GAP;
+          var total = c.note ? noteY + noteH : barY + BAR_H + downH;
+          if (total > g.safeH) {
+            fail("the graphic is " + total + " px tall but the safe zone holds " + g.safeH + ": leave out a marker, the note or a label");
+          }
+          flags.forEach(function (f) {
+            f.top = f.row === "up" ? barY - flagH : barY + BAR_H;
+            f.height = flagH;
+            f.textTop = f.row === "up" ? 0 : FLAG_PAD;
+          });
+          markers.forEach(function (m) {
+            m.top = barY + BAR_H + MARKER_GAP;
+            m.height = markerBox;
+            m.textTop = markerBox - blockH;
+          });
+          var stackY = Math.round(g.safeTop + (g.safeH - total) / 2);
+          return {
+            stackX: g.safeLeft,
+            stackY: stackY,
+            width: barW,
+            total: total,
+            bar: { y: barY, h: BAR_H },
+            head: { h: headH },
+            note: c.note ? { y: noteY, h: noteH } : null,
+            parts: parts,
+            flags: flags,
+            markers: markers,
+          };
+        }
+
+        // When everything happens, and the shortest slot. The heading and the note are in from the start; a part grows at
+        // its own time for its own seconds, left to right in order (a later part never starts before the one on its left);
+        // its flag arrives when it has grown, a marker at its time. Each text holds for its reading time (the tokens'
+        // read_min plus read_per_word a word) before the fade out, so the shortest slot is the latest of those ends plus
+        // the exit. tok(name) is the number of a token custom property.
+        function timePlan(c, tok) {
+          var enter = tok("--dur-enter");
+          var exit = tok("--dur-exit");
+          var micro = tok("--dur-micro");
+          var readMin = tok("--dur-read-min");
+          var readPerWord = tok("--dur-read-per-word");
+          function reading(text) {
+            return readMin + readPerWord * wordCount(text);
+          }
+          var ends = [enter + reading(c.wholeLabel + " " + c.wholeValue)];
+          if (c.note) ends.push(enter + reading(c.note));
+          // a part's flag arrives when it has grown
+          var flagAt = c.parts.map(function (p, i) {
+            var at = "parts[" + i + "]";
+            if (p.seconds < micro - 1e-9) fail(at + ".seconds is " + p.seconds + " s; a part needs at least " + micro + " s to grow");
+            if (i > 0 && p.at < c.parts[i - 1].at - 1e-9) {
+              fail(at + ".at is earlier than parts[" + (i - 1) + "].at: parts grow left to right in order");
+            }
+            ends.push(p.at + p.seconds + enter + reading(p.label + " " + p.display));
+            return p.at + p.seconds;
+          });
+          c.markers.forEach(function (m) {
+            ends.push(m.at + enter + reading(m.label + " " + m.display));
+          });
+          return { enter: enter, exit: exit, flagAt: flagAt, needed: Math.max.apply(null, ends) + exit };
+        }
+
+        // The shortest slot for these variables. It throws what the page would throw for variables it refuses (a label
+        // with no free place included), so the preflight sees it before a render does.
+        function minSlot(V, tok) {
+          var c = readContent(V);
+          layoutFor(c, geometryInput(tok));
+          return timePlan(c, tok).needed;
+        }
+        // logic:end
+
+        // The idiom of the other blocks: the declared defaults first, then what HyperFrames resolved for this
+        // composition (declared defaults plus the mount's overrides). A mounted composition's <html> is not in
+        // the page, so there the second step carries the defaults.
+        function readVars() {
+          var out = {};
+          var raw = document.documentElement.getAttribute("data-composition-variables");
+          if (raw) {
+            JSON.parse(raw).forEach(function (d) {
+              out[d.id] = d.default;
+            });
+          }
+          var hf = window.__hyperframes;
+          var overrides =
+            hf && typeof hf.getVariables === "function" ? hf.getVariables() : window.__hfVariables;
+          if (overrides && typeof overrides === "object") {
+            for (var key in overrides) if (overrides[key] !== undefined) out[key] = overrides[key];
+          }
+          return out;
+        }
+
+        var V = readVars();
+        // No literal fallbacks: a missing or wrong variable fails the render rather than drawing a wrong frame.
+        var content = readContent(V);
+
+        var rootEl = document.querySelector("#sb-root");
+        function token(name) {
+          var value = getComputedStyle(rootEl).getPropertyValue(name).trim();
+          if (!value) throw new Error("tokens.css is not loaded: " + name + " is empty");
+          return value;
+        }
+        function number(name) {
+          return Number.parseFloat(token(name));
+        }
+        var layout = layoutFor(content, geometryInput(number));
+        var plan = timePlan(content, number);
+        var duration = Number.parseFloat(V.durationSeconds);
+        if (!Number.isFinite(duration) || duration + 1e-6 < plan.needed) {
+          throw new Error(
+            NAME + ": durationSeconds " + V.durationSeconds + " is shorter than the " + plan.needed.toFixed(2) +
+              " s it needs (every part grown, its label arriving and read, the fade out)",
+          );
+        }
+
+        function place(el, box) {
+          for (var key in box) el.style[key] = box[key] + "px";
+        }
+        function make(parent, className, text) {
+          var el = document.createElement("div");
+          el.className = className;
+          if (text !== undefined) el.textContent = text;
+          parent.appendChild(el);
+          return el;
+        }
+        // A two-line label: the label, then its display.
+        function addText(parent, className, label, display) {
+          var el = make(parent, className);
+          make(el, "sb-label", label);
+          make(el, "sb-display", display);
+          return el;
+        }
+
+        var stageEl = document.querySelector(".sb-stage");
+        var scrimEl = document.querySelector(".sb-scrim");
+        var stackEl = document.querySelector(".sb-stack");
+        var headEl = document.querySelector(".sb-head");
+        var trackEl = document.querySelector(".sb-track");
+        var noteEl = document.querySelector(".sb-note");
+        document.querySelector(".sb-whole-label").textContent = content.wholeLabel;
+        document.querySelector(".sb-whole-value").textContent = content.wholeValue;
+
+        place(stackEl, { left: layout.stackX, top: layout.stackY, width: layout.width, height: layout.total });
+        place(headEl, { height: layout.head.h });
+        place(trackEl, { top: layout.bar.y, width: layout.width, height: layout.bar.h });
+        if (layout.note) {
+          noteEl.textContent = content.note;
+          place(noteEl, { top: layout.note.y, height: layout.note.h });
+        }
+
+        var partEls = content.parts.map(function (p, i) {
+          var el = make(stackEl, "sb-part sb-tone-" + p.tone);
+          place(el, {
+            left: layout.parts[i].x0,
+            top: layout.bar.y,
+            width: layout.parts[i].x1 - layout.parts[i].x0,
+            height: layout.bar.h,
+          });
+          return el;
+        });
+
+        var flagEls = content.parts.map(function (p, i) {
+          var f = layout.flags[i];
+          var el = make(stackEl, "sb-flag sb-tone-" + p.tone);
+          place(el, { left: f.left, top: f.top, width: f.width, height: f.height });
+          var pole = make(el, "sb-pole");
+          place(pole, { left: f.poleX, width: POLE_W, height: f.height });
+          var text = addText(el, "sb-flag-text" + (f.anchor === "end" ? " sb-end" : ""), p.label, p.display);
+          place(text, { left: f.textLeft, top: f.textTop, width: f.textW });
+          return { pole: pole, text: text, up: f.row === "up" };
+        });
+
+        var markerEls = content.markers.map(function (m, i) {
+          var k = layout.markers[i];
+          var el = make(stackEl, "sb-marker");
+          place(el, { left: k.left, top: k.top, width: k.right - k.left, height: k.height });
+          var bracket = make(el, "sb-bracket");
+          place(bracket, { left: k.bracketLeft, width: k.bracketW, height: BRACKET_H });
+          var text = addText(el, "sb-marker-text" + (k.anchor === "end" ? " sb-end" : ""), m.label, m.display);
+          place(text, { left: k.textLeft, top: k.textTop, width: k.textW });
+          return { bracket: bracket, text: text };
+        });
+
+        var enter = plan.enter;
+        var exit = plan.exit;
+        var easeEnter = token("--ease-enter");
+        var RISE = 12; // entrance travel in px: under the 24 px of the motion rules
+
+        var tl = gsap.timeline({ paused: true });
+
+        // The heading, the faint track and the backing arrive together.
+        tl.fromTo(scrimEl, { opacity: 0 }, { opacity: 1, duration: enter, ease: easeEnter }, 0);
+        tl.fromTo(headEl, { opacity: 0, y: RISE }, { opacity: 1, y: 0, duration: enter, ease: easeEnter }, 0);
+        tl.fromTo(trackEl, { opacity: 0 }, { opacity: 1, duration: enter, ease: easeEnter }, 0);
+        if (layout.note) {
+          tl.fromTo(noteEl, { opacity: 0 }, { opacity: 1, duration: enter, ease: easeEnter }, 0);
+        }
+        // Each part grows from its left edge; its flag comes out of the bar when it has grown.
+        partEls.forEach(function (el, i) {
+          var part = content.parts[i];
+          tl.fromTo(
+            el,
+            { clipPath: "inset(0% 100% 0% 0%)" },
+            { clipPath: "inset(0% 0% 0% 0%)", duration: part.seconds, ease: easeEnter },
+            part.at,
+          );
+          var flag = flagEls[i];
+          tl.fromTo(
+            flag.pole,
+            { clipPath: flag.up ? "inset(100% 0% 0% 0%)" : "inset(0% 0% 100% 0%)" },
+            { clipPath: "inset(0% 0% 0% 0%)", duration: enter, ease: easeEnter },
+            plan.flagAt[i],
+          );
+          tl.fromTo(
+            flag.text,
+            { opacity: 0, y: flag.up ? RISE : -RISE },
+            { opacity: 1, y: 0, duration: enter, ease: easeEnter },
+            plan.flagAt[i],
+          );
+        });
+        // A bracket is drawn from its left end, its label comes in with it.
+        markerEls.forEach(function (marker, i) {
+          var at = content.markers[i].at;
+          tl.fromTo(
+            marker.bracket,
+            { clipPath: "inset(0% 100% 0% 0%)" },
+            { clipPath: "inset(0% 0% 0% 0%)", duration: enter, ease: easeEnter },
+            at,
+          );
+          tl.fromTo(
+            marker.text,
+            { opacity: 0, y: -RISE },
+            { opacity: 1, y: 0, duration: enter, ease: easeEnter },
+            at,
+          );
+        });
+        // The slot ends with the fade out.
+        tl.fromTo(
+          stageEl,
+          { opacity: 1 },
+          { opacity: 0, duration: exit, ease: token("--ease-exit"), immediateRender: false },
+          duration - exit,
+        );
+
+        window.__timelines = window.__timelines || {};
+        window.__timelines["split-bar"] = tl;
+      })();
+    </script>
+  </body>
+</html>

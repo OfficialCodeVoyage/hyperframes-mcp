@@ -1,0 +1,90 @@
+{
+  "files": [
+    {
+      "name": "__ia_thumb.jpg",
+      "source": "original",
+      "size": "8359",
+      "format": "Item Tile"
+    },
+    {
+      "name": "cmlpl_000770_access.jpg",
+      "source": "original",
+      "size": "18869461",
+      "format": "JPEG"
+    },
+    {
+      "name": "cmlpl_000770_access_thumb.jpg",
+      "source": "derivative",
+      "format": "JPEG Thumb",
+      "original": "cmlpl_000770_access.jpg",
+      "size": "15507"
+    },
+    {
+      "name": "cmlpl_000770_archive.torrent",
+      "source": "metadata",
+      "size": "2909",
+      "format": "Archive BitTorrent"
+    },
+    {
+      "name": "cmlpl_000770_files.xml",
+      "source": "original",
+      "format": "Metadata"
+    },
+    {
+      "name": "cmlpl_000770_meta.sqlite",
+      "source": "original",
+      "size": "28672",
+      "format": "Metadata"
+    },
+    {
+      "name": "cmlpl_000770_meta.xml",
+      "source": "original",
+      "size": "2849",
+      "format": "Metadata"
+    },
+    {
+      "name": "cmlpl_000770_metadata.xml",
+      "source": "original",
+      "size": "6242",
+      "format": "Metadata"
+    }
+  ],
+  "files_count": 8,
+  "item_size": 18933999,
+  "metadata": {
+    "identifier": "cmlpl_000770",
+    "call_number": "2018.027.001.157",
+    "collection": [
+      "millvalleylibrary",
+      "californiarevealed",
+      "americana"
+    ],
+    "coverage": "Marin County (Calif.)",
+    "creator": "Unknown",
+    "date": "1920",
+    "description": [
+      "<b>Please visit the California Revealed website to see the most complete and up-to-date version of this object: <a href=\"https://californiarevealed.org/node/518582\" rel=\"ugc nofollow\">https://californiarevealed.org/node/518582</a>.</b>",
+      "Negative is a copy negative of a printed photograph. Blur is inherent to the negative.",
+      "A photographic negative of a section of a panoramic view of Engine No. 4, Mount Tamalpais and Muir Woods Scenic Railway, with passengers in gravity cars at the Double Bow Knot in 1920. This item is part of the collection of Al Graves, a collector of railroad memorabilia and author of several books on Northern California railroads."
+    ],
+    "language": "eng",
+    "licenseurl": "http://creativecommons.org/publicdomain/mark/1.0/",
+    "mediatype": "image",
+    "projectidentifier": "cavpp00107502",
+    "rights": "Public Domain. No restrictions on use.",
+    "source": "Negative (photograph): 1 negative (2 x 3 in)",
+    "subject": [
+      "californiarevealed",
+      "Railroads--California;Mt. Tamalpais and Muir Woods Railroad;Tamalpais, Mount (Calif.)"
+    ],
+    "title": "Mount Tamalpais and Muir Woods Scenic Railway Engine No. 4, at Double Bow Knot, Mount Tamalpais",
+    "title-collection-guide": [
+      "Al Graves Railroads Collection",
+      "https://oac.cdlib.org/findaid/ark:/13030/c8542w8j/"
+    ],
+    "title-series": "Al Graves Railroads Collection",
+    "collection_added": "americana",
+    "publicdate": "2024-08-26 22:56:28",
+    "addeddate": "2024-08-26 22:56:28"
+  }
+}

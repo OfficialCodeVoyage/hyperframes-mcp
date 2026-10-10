@@ -1,0 +1,247 @@
+<!--
+  Copyright 2026 the hyperframes-mcp contributors. Hand-written for the motion library (src/hyperframes_mcp/motion); it shares no code
+  with the HyperFrames catalog. The wrapper, the scrim and the use of data-color-grading follow photo-shot
+  (which follows an earlier prototype of ours).
+
+  A full-frame silent clip (an image-to-video MP4 of a few seconds) shown for the length of its slot, with the
+  library's finish: vignette and grain from tokens.finish, applied through data-color-grading with the grade
+  variable on top, exactly as for a photograph, so a clip matches the photographs around it. There is no camera
+  move and no fade here: the clip is the motion, and the composer cross-fades shots by fading a wrapper (a graded
+  element is never given an opacity tween: the grading shader starts a tween of its opacity from black).
+  The clip is always shown to cover the frame (object-fit: cover): a clip that is not 16:9 is cropped to fill it.
+  The clip's own sound is never heard (the element is muted and carries no audio).
+  When the slot is longer than the clip after trimStart, hold says what happens: freeze keeps the last frame,
+  loop plays the trimmed clip again from trimStart. HyperFrames decodes the video itself and seeks it by frame, so
+  a render is a pure function of the time: the playback attributes below are set from the variables and read by the
+  renderer, and the script never plays, pauses or seeks the element.
+-->
+<!doctype html>
+<html
+  lang="en"
+  data-composition-variables='[
+    {"id":"durationSeconds","type":"number","label":"Seconds on screen, the whole slot","default":6,"min":1.2,"max":60,"step":0.1,"unit":"s"},
+    {"id":"video","type":"string","label":"Clip, an MP4 path relative to the project (a sample project supplies the default)","default":"assets/video/sample-clip.mp4","maxLength":200},
+    {"id":"trimStart","type":"number","label":"Seconds into the clip where playback starts","default":0,"min":0,"max":600,"step":0.1,"unit":"s"},
+    {"id":"grade","type":"string","label":"Grade for data-color-grading: JSON of exposure, contrast, temperature and the other adjustments","default":"{\"exposure\":0,\"contrast\":0.05,\"temperature\":0.05}","maxLength":300},
+    {"id":"scrim","type":"enum","label":"Darkening behind text","default":"bottom","options":[{"value":"none","label":"None"},{"value":"left","label":"Left"},{"value":"bottom","label":"Bottom"}]},
+    {"id":"hold","type":"enum","label":"When the slot is longer than the clip after trimStart","default":"freeze","options":[{"value":"freeze","label":"Freeze the last frame"},{"value":"loop","label":"Play it again from trimStart"}]}
+  ]'
+>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <title>Video shot</title>
+    <link rel="stylesheet" href="tokens.css" />
+    <script src="vendor/gsap.min.js"></script>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        width: 1920px;
+        height: 1080px;
+        overflow: hidden;
+        background: transparent;
+      }
+      #video-root {
+        position: relative;
+        width: 1920px;
+        height: 1080px;
+        overflow: hidden;
+        background: var(--color-night);
+      }
+      #video-root .clip-video {
+        position: absolute;
+        left: 0;
+        top: 0;
+        display: block;
+        width: 1920px;
+        height: 1080px;
+        object-fit: cover;
+      }
+      #video-root .scrim {
+        position: absolute;
+        display: none;
+      }
+      #video-root .scrim[data-scrim="bottom"] {
+        display: block;
+        left: 0;
+        bottom: 0;
+        width: 100%;
+        height: 300px;
+        background: linear-gradient(
+          to top,
+          color-mix(in srgb, var(--color-scrim) 62%, transparent) 0%,
+          color-mix(in srgb, var(--color-scrim) 36%, transparent) 38%,
+          color-mix(in srgb, var(--color-scrim) 14%, transparent) 72%,
+          transparent 100%
+        );
+      }
+      #video-root .scrim[data-scrim="left"] {
+        display: block;
+        left: 0;
+        top: 0;
+        width: 1100px;
+        height: 100%;
+        background: linear-gradient(
+          to right,
+          color-mix(in srgb, var(--color-scrim) 82%, transparent) 0%,
+          color-mix(in srgb, var(--color-scrim) 72%, transparent) 42%,
+          color-mix(in srgb, var(--color-scrim) 30%, transparent) 74%,
+          transparent 100%
+        );
+      }
+    </style>
+  </head>
+  <body>
+    <div
+      id="video-root"
+      data-composition-id="video-shot"
+      data-width="1920"
+      data-height="1080"
+      data-start="0"
+      data-duration="6"
+    >
+      <!-- src is an empty data URL, never a file: the renderer moves a video to its mount's start and window only
+           when it finds a src in the markup (an element whose src only the script sets is placed by its local
+           start, so every mount would play from the start of the video), and the script then replaces it with the
+           video variable. If the script threw before that, the strict render fails with the script's error
+           instead of drawing a wrong frame. data-duration is left out on purpose: the script sets it to the slot,
+           and a number in the markup would cap the clip at it. -->
+      <video
+        id="video-shot-clip"
+        class="clip-video"
+        src="data:video/mp4;base64,"
+        muted
+        playsinline
+        data-start="0"
+        data-volume="0"
+      ></video>
+      <div class="scrim" data-scrim="none"></div>
+    </div>
+
+    <script>
+      (function () {
+        "use strict";
+
+        // The idiom of the other blocks: the declared defaults first, then what HyperFrames resolved for this
+        // composition (declared defaults plus the mount's overrides). A mounted composition's <html> is not in
+        // the page, so there the second step carries the defaults.
+        function readVars() {
+          var out = {};
+          var raw = document.documentElement.getAttribute("data-composition-variables");
+          if (raw) {
+            JSON.parse(raw).forEach(function (d) {
+              out[d.id] = d.default;
+            });
+          }
+          var hf = window.__hyperframes;
+          var overrides =
+            hf && typeof hf.getVariables === "function" ? hf.getVariables() : window.__hfVariables;
+          if (overrides && typeof overrides === "object") {
+            for (var key in overrides) if (overrides[key] !== undefined) out[key] = overrides[key];
+          }
+          return out;
+        }
+
+        // No literal fallbacks: a missing or malformed variable fails the render rather than drawing a wrong frame.
+        function json(name, value) {
+          if (typeof value !== "string") return value;
+          try {
+            return JSON.parse(value);
+          } catch (err) {
+            throw new Error("video-shot: " + name + " is not valid JSON: " + value);
+          }
+        }
+
+        var V = readVars();
+        var video = typeof V.video === "string" ? V.video.trim() : "";
+        if (video.length === 0) {
+          throw new Error("video-shot: the video variable is missing or empty");
+        }
+        var trimStart = Number(V.trimStart);
+        if (V.trimStart === "" || V.trimStart === null || !Number.isFinite(trimStart) || trimStart < 0) {
+          throw new Error("video-shot: trimStart must be a number of seconds, zero or more, got " + V.trimStart);
+        }
+        var hold = V.hold;
+        if (hold !== "freeze" && hold !== "loop") {
+          throw new Error("video-shot: hold must be freeze or loop, got " + hold);
+        }
+        var adjust = json("grade", V.grade);
+        // the shader's adjustments and their ranges (exposure in stops, the rest -1 to 1)
+        var LIMITS = {
+          exposure: 2, contrast: 1, highlights: 1, shadows: 1, whites: 1, blacks: 1,
+          temperature: 1, tint: 1, vibrance: 1, saturation: 1,
+        };
+        if (!adjust || typeof adjust !== "object" || Array.isArray(adjust)) {
+          throw new Error("video-shot: grade must be a JSON object, got " + V.grade);
+        }
+        Object.keys(adjust).forEach(function (key) {
+          var value = adjust[key];
+          if (!(key in LIMITS) || !Number.isFinite(value) || Math.abs(value) > LIMITS[key]) {
+            throw new Error("video-shot: grade." + key + " is not a known adjustment in range: " + value);
+          }
+        });
+        var scrimKind = V.scrim;
+        if (scrimKind !== "none" && scrimKind !== "left" && scrimKind !== "bottom") {
+          throw new Error("video-shot: scrim must be none, left or bottom, got " + scrimKind);
+        }
+
+        var rootEl = document.querySelector("#video-root");
+        var clipEl = rootEl.querySelector(".clip-video");
+
+        function token(name) {
+          var value = getComputedStyle(rootEl).getPropertyValue(name).trim();
+          if (!value) throw new Error("tokens.css is not loaded: " + name + " is empty");
+          return value;
+        }
+        var duration = Number.parseFloat(V.durationSeconds);
+        var shortest = Number.parseFloat(token("--dur-cinematic-min"));
+        if (!Number.isFinite(duration) || duration < shortest) {
+          throw new Error(
+            "video-shot: durationSeconds " + V.durationSeconds + " is shorter than the " + shortest +
+              " s a shot needs",
+          );
+        }
+
+        // What the renderer reads from the element (HyperFrames pre-extracts the frames of every <video> it
+        // finds and puts the frame of each output time in its place): the file, where in it playback starts, how
+        // long the element is on screen, and whether it plays again at the end. Without loop the renderer holds
+        // the last frame after the end of the file.
+        clipEl.setAttribute("data-duration", String(duration));
+        clipEl.setAttribute("data-media-start", String(trimStart));
+        if (hold === "loop") clipEl.setAttribute("loop", "");
+
+        // The library's finish: vignette and grain from the tokens, the v2 shader shape around them, and the shot's own grade on top; the same as photo-shot, so a clip and a photograph match.
+        clipEl.setAttribute(
+          "data-color-grading",
+          JSON.stringify({
+            preset: "neutral",
+            intensity: 1,
+            adjust: adjust,
+            details: {
+              vignette: Number.parseFloat(token("--finish-vignette")),
+              vignetteMidpoint: 0.5,
+              vignetteFeather: 0.75,
+              grain: Number.parseFloat(token("--finish-grain")),
+              grainSize: 0.3,
+              grainRoughness: 0.55,
+            },
+          }),
+        );
+        clipEl.setAttribute("src", video);
+        rootEl.querySelector(".scrim").setAttribute("data-scrim", scrimKind);
+
+        // The clip is the motion; the timeline only carries the slot's length (the last mark is at the slot's end).
+        var tl = gsap.timeline({ paused: true });
+        tl.set(clipEl, { x: 0 }, duration);
+
+        window.__timelines = window.__timelines || {};
+        window.__timelines["video-shot"] = tl;
+      })();
+    </script>
+  </body>
+</html>

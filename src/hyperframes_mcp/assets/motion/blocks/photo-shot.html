@@ -1,0 +1,336 @@
+<!--
+  Copyright 2026 the hyperframes-mcp contributors. Hand-written for the motion library (src/hyperframes_mcp/motion); it shares no code
+  with the HyperFrames catalog. The wrapper structure (a frame, a camera layer that is moved, the graded image, a
+  scrim) and the use of data-color-grading follow an earlier prototype.
+
+  A full-frame archival photograph with one slow camera move (a Ken Burns glide) from one crop to another.
+  There is no fade here: the composer cross-fades shots, and a graded <img> is never given an opacity tween
+  (the grading shader starts a tween of its opacity from black). The move is clamped so that, whatever crops are
+  asked for, the camera never pans faster than the camera.max_pan_px_per_s token or zooms faster than
+  camera.max_zoom_per_s; both limits hold at the fastest moment of the eased move, not only on average.
+  The library's finish (vignette and grain, tokens.finish) is always applied through data-color-grading, with the
+  grade variable (exposure, contrast, temperature, ...) added to it. No photograph is stored in the library: the
+  default image path is one a sample project supplies (assets/img/sample-photo.jpg, a 16:9 picture).
+-->
+<!doctype html>
+<html
+  lang="en"
+  data-composition-variables='[
+    {"id":"durationSeconds","type":"number","label":"Seconds on screen, the whole camera move included","default":6,"min":1.2,"max":60,"step":0.1,"unit":"s"},
+    {"id":"image","type":"string","label":"Photograph, a path relative to the project (a sample project supplies the default)","default":"assets/img/sample-photo.jpg","maxLength":200},
+    {"id":"from","type":"string","label":"Camera frame at the start: [x, y, width, height] as fractions of the image, 16:9 on screen","default":"[0, 0, 1, 1]","maxLength":80},
+    {"id":"to","type":"string","label":"Camera frame at the end, same form and the same aspect as the start","default":"[0.12, 0.1, 0.8, 0.8]","maxLength":80},
+    {"id":"grade","type":"string","label":"Grade for data-color-grading: JSON of exposure, contrast, temperature and the other adjustments","default":"{\"exposure\":0,\"contrast\":0.05,\"temperature\":0.05}","maxLength":300},
+    {"id":"scrim","type":"enum","label":"Darkening behind text","default":"bottom","options":[{"value":"none","label":"None"},{"value":"left","label":"Left"},{"value":"bottom","label":"Bottom"}]}
+  ]'
+>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <title>Photo shot</title>
+    <link rel="stylesheet" href="tokens.css" />
+    <script src="vendor/gsap.min.js"></script>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        width: 1920px;
+        height: 1080px;
+        overflow: hidden;
+        background: transparent;
+      }
+      #photo-root {
+        position: relative;
+        width: 1920px;
+        height: 1080px;
+        overflow: hidden;
+        background: var(--color-night);
+      }
+      #photo-root .camera {
+        position: absolute;
+        left: 0;
+        top: 0;
+        transform-origin: 0 0;
+      }
+      #photo-root .photo {
+        display: block;
+        width: 100%;
+        height: 100%;
+      }
+      #photo-root .scrim {
+        position: absolute;
+        display: none;
+      }
+      #photo-root .scrim[data-scrim="bottom"] {
+        display: block;
+        left: 0;
+        bottom: 0;
+        width: 100%;
+        height: 300px;
+        background: linear-gradient(
+          to top,
+          color-mix(in srgb, var(--color-scrim) 62%, transparent) 0%,
+          color-mix(in srgb, var(--color-scrim) 36%, transparent) 38%,
+          color-mix(in srgb, var(--color-scrim) 14%, transparent) 72%,
+          transparent 100%
+        );
+      }
+      #photo-root .scrim[data-scrim="left"] {
+        display: block;
+        left: 0;
+        top: 0;
+        width: 1100px;
+        height: 100%;
+        background: linear-gradient(
+          to right,
+          color-mix(in srgb, var(--color-scrim) 82%, transparent) 0%,
+          color-mix(in srgb, var(--color-scrim) 72%, transparent) 42%,
+          color-mix(in srgb, var(--color-scrim) 30%, transparent) 74%,
+          transparent 100%
+        );
+      }
+    </style>
+  </head>
+  <body>
+    <div
+      id="photo-root"
+      data-composition-id="photo-shot"
+      data-width="1920"
+      data-height="1080"
+      data-start="0"
+      data-duration="6"
+    >
+      <div class="camera" data-layout-allow-overflow>
+        <img class="photo" alt="" />
+      </div>
+      <div class="scrim" data-scrim="none"></div>
+    </div>
+
+    <script>
+      (function () {
+        "use strict";
+
+        // The idiom of the other blocks: the declared defaults first, then what HyperFrames resolved for this
+        // composition (declared defaults plus the mount's overrides). A mounted composition's <html> is not in
+        // the page, so there the second step carries the defaults.
+        function readVars() {
+          var out = {};
+          var raw = document.documentElement.getAttribute("data-composition-variables");
+          if (raw) {
+            JSON.parse(raw).forEach(function (d) {
+              out[d.id] = d.default;
+            });
+          }
+          var hf = window.__hyperframes;
+          var overrides =
+            hf && typeof hf.getVariables === "function" ? hf.getVariables() : window.__hfVariables;
+          if (overrides && typeof overrides === "object") {
+            for (var key in overrides) if (overrides[key] !== undefined) out[key] = overrides[key];
+          }
+          return out;
+        }
+
+        // <move-math>
+        // The camera, in the geometry the composer never has to know. The camera layer is the photograph at
+        // lw x lh pixels, sized so that the start crop (width fraction from[2]) fills the frame at scale 1;
+        // a crop [x, y, w, h] is then shown by scale = from[2] / w and the offsets of view(). GSAP tweens
+        // scale, x and y in a straight line each, eased: the view's centre is therefore not a straight line,
+        // so the clamp does not use a formula. It plays the real tween (STEPS samples) and, when the move
+        // is too fast, pulls the end crop back along its own direction (centre in a straight line, width
+        // geometrically) with a bisection until neither the pan (screen pixels per second of the view's
+        // centre) nor the zoom (log scale per second) exceeds its limit at any sample. The limits hold at
+        // the fastest moment of the ease, which is twice the average speed, not only on average.
+        var STEPS = 960; // samples of the move: the speed is a smooth curve with one corner, at the middle of the ease
+        var MARGIN = 0.995; // stay half a percent under the limit, so a finer check cannot go over it
+        var MAX_OVER = 3; // the largest zoom the canvas is oversampled for, in times the layer's scale 1 size
+        var MAX_LAYER = 8192; // the longest side, in pixels, of the layer the grading shader draws into
+        function planMove(from, to, seconds, width, height, maxPan, maxZoom) {
+          var lw = width / from[2];
+          var lh = height / from[3];
+          function ease(t) {
+            // power1.inOut: the ease of the tween below, written out so the move can be sampled
+            return t < 0.5 ? 2 * t * t : 1 - 2 * (1 - t) * (1 - t);
+          }
+          function view(box) {
+            var scale = from[2] / box[2];
+            return { scale: scale, x: -box[0] * lw * scale, y: -box[1] * lh * scale };
+          }
+          function crop(f) {
+            var w = from[2] * Math.pow(to[2] / from[2], f);
+            var h = (w * from[3]) / from[2];
+            var fromX = from[0] + from[2] / 2;
+            var fromY = from[1] + from[3] / 2;
+            var cx = fromX + f * (to[0] + to[2] / 2 - fromX);
+            var cy = fromY + f * (to[1] + to[3] / 2 - fromY);
+            return [cx - w / 2, cy - h / 2, w, h];
+          }
+          function slowEnough(a, b) {
+            var dt = seconds / STEPS;
+            var prev = null;
+            for (var i = 0; i <= STEPS; i++) {
+              var p = ease(i / STEPS);
+              var s = a.scale + p * (b.scale - a.scale);
+              var cx = (width / 2 - (a.x + p * (b.x - a.x))) / s;
+              var cy = (height / 2 - (a.y + p * (b.y - a.y))) / s;
+              if (prev) {
+                var pan = (Math.hypot(cx - prev.cx, cy - prev.cy) * (s + prev.s)) / 2 / dt;
+                var zoom = Math.abs(Math.log(s / prev.s)) / dt;
+                if (pan > maxPan * MARGIN || zoom > maxZoom * MARGIN) return false;
+              }
+              prev = { cx: cx, cy: cy, s: s };
+            }
+            return true;
+          }
+          var start = view(from);
+          var factor = 1;
+          if (!slowEnough(start, view(crop(1)))) {
+            var low = 0;
+            var high = 1;
+            for (var k = 0; k < 30; k++) {
+              var mid = (low + high) / 2;
+              if (slowEnough(start, view(crop(mid)))) low = mid;
+              else high = mid;
+            }
+            factor = low;
+          }
+          var end = crop(factor);
+          // The grading shader draws into a canvas of the layer's own pixel size and the camera scales that
+          // canvas, so a layer sized for scale 1 goes soft when the camera zooms in. The layer is made OVER
+          // times larger (the largest zoom of the move, at most MAX_OVER) and the scale tween shrinks by the
+          // same factor: the picture on screen is identical, the canvas is sharp. A crop much narrower than the
+          // photograph makes the layer huge (a tenth wide: 19200 px), so no side of it passes MAX_LAYER; the
+          // factor is then below 1, the canvas is shown a little enlarged and the picture is still identical.
+          var over = Math.min(MAX_OVER, Math.max(1, from[2] / end[2]), MAX_LAYER / Math.max(lw, lh));
+          function tween(v) {
+            return { scale: v.scale / over, x: v.x, y: v.y };
+          }
+          return {
+            lw: lw * over, lh: lh * over, over: over, factor: factor, start: tween(start), end: tween(view(end)),
+          };
+        }
+        // </move-math>
+
+        // No literal fallbacks: a missing or malformed variable fails the render rather than drawing a wrong frame.
+        function json(name, value) {
+          if (typeof value !== "string") return value;
+          try {
+            return JSON.parse(value);
+          } catch (err) {
+            throw new Error("photo-shot: " + name + " is not valid JSON: " + value);
+          }
+        }
+        function box(name, value) {
+          var b = json(name, value);
+          if (!Array.isArray(b) || b.length !== 4 || !b.every(Number.isFinite)) {
+            throw new Error("photo-shot: " + name + " must be [x, y, width, height], got " + value);
+          }
+          var inside = b[0] >= 0 && b[1] >= 0 && b[2] > 0 && b[3] > 0;
+          if (!inside || b[0] + b[2] > 1.0001 || b[1] + b[3] > 1.0001) {
+            throw new Error("photo-shot: " + name + " must lie inside the image (fractions 0 to 1), got " + value);
+          }
+          return b;
+        }
+
+        var V = readVars();
+        var image = typeof V.image === "string" ? V.image.trim() : "";
+        if (image.length === 0) {
+          throw new Error("photo-shot: the image variable is missing or empty");
+        }
+        var from = box("from", V.from);
+        var to = box("to", V.to);
+        // the two crops keep the picture's aspect, so their height to width ratio is one number
+        if (Math.abs(to[3] / to[2] / (from[3] / from[2]) - 1) > 0.01) {
+          throw new Error("photo-shot: from and to must have the same aspect (height / width of the crop)");
+        }
+        var adjust = json("grade", V.grade);
+        // the shader's adjustments and their ranges (exposure in stops, the rest -1 to 1)
+        var LIMITS = {
+          exposure: 2, contrast: 1, highlights: 1, shadows: 1, whites: 1, blacks: 1,
+          temperature: 1, tint: 1, vibrance: 1, saturation: 1,
+        };
+        if (!adjust || typeof adjust !== "object" || Array.isArray(adjust)) {
+          throw new Error("photo-shot: grade must be a JSON object, got " + V.grade);
+        }
+        Object.keys(adjust).forEach(function (key) {
+          var value = adjust[key];
+          if (!(key in LIMITS) || !Number.isFinite(value) || Math.abs(value) > LIMITS[key]) {
+            throw new Error("photo-shot: grade." + key + " is not a known adjustment in range: " + value);
+          }
+        });
+        var scrimKind = V.scrim;
+        if (scrimKind !== "none" && scrimKind !== "left" && scrimKind !== "bottom") {
+          throw new Error("photo-shot: scrim must be none, left or bottom, got " + scrimKind);
+        }
+
+        var rootEl = document.querySelector("#photo-root");
+        var cameraEl = rootEl.querySelector(".camera");
+        var photoEl = rootEl.querySelector(".photo");
+
+        function token(name) {
+          var value = getComputedStyle(rootEl).getPropertyValue(name).trim();
+          if (!value) throw new Error("tokens.css is not loaded: " + name + " is empty");
+          return value;
+        }
+        var duration = Number.parseFloat(V.durationSeconds);
+        var shortest = Number.parseFloat(token("--dur-cinematic-min"));
+        if (!Number.isFinite(duration) || duration < shortest) {
+          throw new Error(
+            "photo-shot: durationSeconds " + V.durationSeconds + " is shorter than the " + shortest +
+              " s a camera move needs",
+          );
+        }
+
+        var move = planMove(
+          from,
+          to,
+          duration,
+          Number.parseFloat(rootEl.getAttribute("data-width")),
+          Number.parseFloat(rootEl.getAttribute("data-height")),
+          Number.parseFloat(token("--camera-max-pan-px-per-s")),
+          Number.parseFloat(token("--camera-max-zoom-per-s")),
+        );
+        cameraEl.style.width = move.lw + "px";
+        cameraEl.style.height = move.lh + "px";
+
+        // The library's finish: vignette and grain from the tokens, the v2 shader shape around them, and the shot's own grade on top. The image is never faded (see the header).
+        photoEl.setAttribute(
+          "data-color-grading",
+          JSON.stringify({
+            preset: "neutral",
+            intensity: 1,
+            adjust: adjust,
+            details: {
+              vignette: Number.parseFloat(token("--finish-vignette")),
+              vignetteMidpoint: 0.5,
+              vignetteFeather: 0.75,
+              grain: Number.parseFloat(token("--finish-grain")),
+              grainSize: 0.3,
+              grainRoughness: 0.55,
+            },
+          }),
+        );
+        // The grading shader seeds its grain from the image's id; without one it uses the full URL, whose port
+        // changes with every render and makes two renders of one shot differ. The id comes from the path.
+        photoEl.id = "photo-" + image.replace(/[^A-Za-z0-9]+/g, "-");
+        photoEl.setAttribute("src", image);
+        rootEl.querySelector(".scrim").setAttribute("data-scrim", scrimKind);
+
+        // One tween fills the slot: the first and last frame are the two crops.
+        var tl = gsap.timeline({ paused: true });
+        tl.fromTo(
+          cameraEl,
+          { scale: move.start.scale, x: move.start.x, y: move.start.y },
+          { scale: move.end.scale, x: move.end.x, y: move.end.y, duration: duration, ease: "power1.inOut" },
+          0,
+        );
+
+        window.__timelines = window.__timelines || {};
+        window.__timelines["photo-shot"] = tl;
+      })();
+    </script>
+  </body>
+</html>

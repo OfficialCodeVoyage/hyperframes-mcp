@@ -1,0 +1,93 @@
+# Settings of the picture and clip tools. A copy of this file at ~/.hyperframes-mcp/config/settings.yaml replaces it.
+visuals:
+  # Limits for downloading a stock photo or clip (stock/downloader.py). The
+  # timeout covers one whole download, not each socket read.
+  stock_download:
+    # Storyblocks' API only returns watermarked preview clips and no licensed
+    # download is implemented, so stock video search skips it. Turn on only
+    # after a licensed download exists.
+    storyblocks_enabled: false
+    max_video_mb: 200
+    max_photo_mb: 25
+    timeout_seconds: 300
+
+  # Free archives the search_media tool asks (Library of Congress, Wikimedia Commons, Internet Archive, Openverse).
+  archival:
+    # The User-Agent on every archival search and download. Wikimedia's policy asks for a name and a contact (a URL
+    # or an address) and may throttle or block clients without one: keep a URL here, not a personal address, and point
+    # it at the page the archives should reach you at.
+    user_agent: "hyperframes-mcp/0.1 (https://github.com/OfficialCodeVoyage/hyperframes-mcp; read-only image search)"
+
+  # AI image generation
+  ai_image:
+    # Variants generated per AI-image cue. 1 for the MVP: one image per beat.
+    # Raise it to offer alternates in the review UI; the manifest still places
+    # only the selected variant (else the first) for each cue.
+    variants_per_cue: 1
+
+    # Image backend (src/visual_generator/ai_image). To migrate off gpt-image-1, which
+    # shuts down 2026-10-23, change provider + model + presets together:
+    #   provider: openai  (key: OPENAI_API_KEY)   model e.g. gpt-image-2.5-flare
+    #   provider: fal     (key: FAL_KEY)          model = a fal endpoint id, e.g.
+    #                     fal-ai/flux-2-pro, openai/gpt-image-2.5/flare/text-to-image
+    # Every preset must be priced in the table below, or startup fails with the missing entry.
+    provider: openai
+    model: gpt-image-1
+    # A preset is a quality and a size. "draft" is also what an unknown preset name falls
+    # back to. Flat-priced models (FLUX, Seedream) ignore quality; Seedream 5 Lite needs at
+    # least 2560x1440 pixels, so give it its own sizes here.
+    presets:
+      draft: {quality: low, size: 1024x1024}
+      production: {quality: medium, size: 1024x1024}
+
+    # USD per image, used for the pre-flight budget check and the usage record. Figures were
+    # read from the provider pages named in each note on 2026-09-30; "estimate" marks what no
+    # page states directly. Each entry has exactly one of: flat, per_image
+    # ({quality: {WxH: usd}}; an unlisted size is priced at the higher of its two listed neighbours) or
+    # per_megapixel. Token-priced models (gpt-image-2.x) move with prompt length.
+    pricing:
+      openai:
+        gpt-image-1:
+          note: "developers.openai.com/api/docs/models/gpt-image-1; shuts down 2026-10-23"
+          per_image:
+            low: {1024x1024: 0.011, 1024x1536: 0.016, 1536x1024: 0.016}
+            medium: {1024x1024: 0.042, 1024x1536: 0.063, 1536x1024: 0.063}
+            high: {1024x1024: 0.167, 1024x1536: 0.25, 1536x1024: 0.25}
+        gpt-image-2.5-flare: &gpt_image_25
+          note: >-
+            estimate: OpenAI lists tokens only ($30 per 1M image-output tokens); these are
+            fal's per-image figures for the same model (fal.ai/learn/devs/gpt-image-2-5-vs-gpt-image-2,
+            2026-09-14)
+          per_image: &gpt_image_25_table
+            low: {1024x768: 0.00402, 1024x1024: 0.00588, 1024x1536: 0.00474, 1920x1080: 0.00441, 2560x1440: 0.00615, 3840x2160: 0.01113}
+            medium: {1024x768: 0.00903, 1024x1024: 0.01317, 1024x1536: 0.01029, 1920x1080: 0.01029, 2560x1440: 0.01434, 3840x2160: 0.02595}
+            high: {1024x768: 0.03612, 1024x1024: 0.05268, 1024x1536: 0.04116, 1920x1080: 0.0396, 2560x1440: 0.05529, 3840x2160: 0.10008}
+            xhigh: {1024x768: 0.0642, 1024x1024: 0.09366, 1024x1536: 0.07377, 1920x1080: 0.07041, 2560x1440: 0.09828, 3840x2160: 0.1779}
+            max: {1024x768: 0.14445, 1024x1024: 0.21072, 1024x1536: 0.16464, 1920x1080: 0.1584, 2560x1440: 0.2211, 3840x2160: 0.40026}
+        gpt-image-2.5-sunburst: *gpt_image_25
+      fal:
+        fal-ai/flux-2-pro:
+          note: >-
+            fal.ai/models/fal-ai/flux-2-pro: $0.03 for the first megapixel plus $0.015 per
+            extra megapixel, rounded up (page example: 1920x1080 = $0.045)
+          per_megapixel: {first: 0.03, extra: 0.015}
+        fal-ai/bytedance/seedream/v5/lite/text-to-image:
+          note: "fal.ai/models/fal-ai/bytedance/seedream/v5/lite/text-to-image: $0.035 per image"
+          flat: 0.035
+        fal-ai/bytedance/seedream/v4.5/text-to-image:
+          note: "fal.ai/models/fal-ai/bytedance/seedream/v4.5/text-to-image: $0.04 per image"
+          flat: 0.04
+        openai/gpt-image-2.5/flare/text-to-image:
+          note: >-
+            fal.ai/models/openai/gpt-image-2.5/flare/text-to-image pricing table; token-priced,
+            so longer prompts cost more
+          per_image: *gpt_image_25_table
+        openai/gpt-image-2.5/sunburst/text-to-image:
+          note: "same table as flare (fal.ai/learn/devs/gpt-image-2-5-vs-gpt-image-2, 2026-09-14)"
+          per_image: *gpt_image_25_table
+        openai/gpt-image-2:
+          note: "fal.ai/learn/devs/gpt-image-2-5-vs-gpt-image-2 (2026-09-14), text-to-image rows"
+          per_image:
+            low: {1024x768: 0.005, 1024x1024: 0.006, 1024x1536: 0.005, 1920x1080: 0.005, 2560x1440: 0.007, 3840x2160: 0.012}
+            medium: {1024x768: 0.037, 1024x1024: 0.053, 1024x1536: 0.042, 1920x1080: 0.04, 2560x1440: 0.056, 3840x2160: 0.101}
+            high: {1024x768: 0.145, 1024x1024: 0.211, 1024x1536: 0.165, 1920x1080: 0.158, 2560x1440: 0.222, 3840x2160: 0.401}

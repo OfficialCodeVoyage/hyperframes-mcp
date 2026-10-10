@@ -1,0 +1,366 @@
+<!--
+  Copyright 2026 the hyperframes-mcp contributors. Hand-written for the motion library (src/hyperframes_mcp/motion); it shares no code
+  with the HyperFrames catalog.
+
+  A vector graphic (an icon, an arrow, a seal) over the picture: it reads one SVG file of the project (a path under
+  assets/media/vectors, which the hyperframes-edit tools save after a strict check), puts it in the page as inline SVG so that
+  it stays sharp, takes its colour from a palette token (an SVG paints with currentColor; a palette colour written in
+  the SVG itself is kept), and arrives in one of three ways, all over the enter time: "stamp" (it scales down onto the
+  frame with the emphasis ease), "draw-on" (each stroke draws itself; a filled shape is wiped in from the left) or
+  "fade". It then holds and fades out with the exit ease. Every colour, duration and ease comes from tokens.css
+  (assets/motion/tokens.json); the SVG is read again as it is loaded: only drawing elements stay, with no script, style,
+  event attribute or reference to anything but an id of its own.
+-->
+<!doctype html>
+<html
+  lang="en"
+  data-composition-variables='[
+    {"id":"durationSeconds","type":"number","label":"Seconds on screen, the entrance and the fade out included","default":4,"min":2.4,"max":30,"step":0.1,"unit":"s"},
+    {"id":"svg","type":"string","label":"The vector: a path to an SVG inside the project, for example assets/media/vectors/arrow.svg (a sample project supplies the default)","default":"assets/media/vectors/stamp.svg","maxLength":200},
+    {"id":"position","type":"enum","label":"Where on the frame, inside the safe zone","default":"top-left","options":[{"value":"top-left","label":"Top left"},{"value":"top-right","label":"Top right"},{"value":"bottom-left","label":"Bottom left"},{"value":"bottom-right","label":"Bottom right"},{"value":"center","label":"Centre"}]},
+    {"id":"size","type":"enum","label":"The square it fits in: small 160 px, medium 280 px, large 440 px","default":"medium","options":[{"value":"small","label":"Small"},{"value":"medium","label":"Medium"},{"value":"large","label":"Large"}]},
+    {"id":"color","type":"enum","label":"Palette colour of what the SVG paints with currentColor","default":"gold","options":[{"value":"gold","label":"Gold"},{"value":"gold_dim","label":"Dim gold"},{"value":"paper","label":"Paper"},{"value":"paper_aged","label":"Aged paper"},{"value":"ink","label":"Ink"},{"value":"oxblood","label":"Oxblood"},{"value":"verdigris","label":"Verdigris"},{"value":"slate","label":"Slate"},{"value":"loss","label":"Loss"},{"value":"gain","label":"Gain"}]},
+    {"id":"animation","type":"enum","label":"How it arrives","default":"stamp","options":[{"value":"stamp","label":"Stamp"},{"value":"draw-on","label":"Draw on"},{"value":"fade","label":"Fade"}]}
+  ]'
+>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <title>Graphic stamp</title>
+    <link rel="stylesheet" href="tokens.css" />
+    <script src="vendor/gsap.min.js"></script>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        width: 1920px;
+        height: 1080px;
+        overflow: hidden;
+        background: transparent;
+      }
+      #graphic-root {
+        position: relative;
+        width: 1920px;
+        height: 1080px;
+        overflow: hidden;
+      }
+      #graphic-root .place {
+        position: absolute;
+        width: var(--box);
+        height: var(--box);
+      }
+      #graphic-root .place[data-size="small"] {
+        --box: 160px;
+      }
+      #graphic-root .place[data-size="medium"] {
+        --box: 280px;
+      }
+      #graphic-root .place[data-size="large"] {
+        --box: 440px;
+      }
+      #graphic-root .place[data-position="top-left"] {
+        left: var(--safe-left);
+        top: var(--safe-top);
+      }
+      #graphic-root .place[data-position="top-right"] {
+        right: var(--safe-right);
+        top: var(--safe-top);
+      }
+      #graphic-root .place[data-position="bottom-left"] {
+        left: var(--safe-left);
+        bottom: var(--safe-bottom);
+      }
+      #graphic-root .place[data-position="bottom-right"] {
+        right: var(--safe-right);
+        bottom: var(--safe-bottom);
+      }
+      #graphic-root .place[data-position="center"] {
+        left: calc(50% - var(--box) / 2);
+        top: calc(50% - var(--box) / 2);
+      }
+      #graphic-root .art {
+        width: 100%;
+        height: 100%;
+        color: var(--color-gold);
+        opacity: 0;
+      }
+      #graphic-root .art[data-color="gold_dim"] {
+        color: var(--color-gold-dim);
+      }
+      #graphic-root .art[data-color="paper"] {
+        color: var(--color-paper);
+      }
+      #graphic-root .art[data-color="paper_aged"] {
+        color: var(--color-paper-aged);
+      }
+      #graphic-root .art[data-color="ink"] {
+        color: var(--color-ink);
+      }
+      #graphic-root .art[data-color="oxblood"] {
+        color: var(--color-oxblood);
+      }
+      #graphic-root .art[data-color="verdigris"] {
+        color: var(--color-verdigris);
+      }
+      #graphic-root .art[data-color="slate"] {
+        color: var(--color-slate);
+      }
+      #graphic-root .art[data-color="loss"] {
+        color: var(--color-loss);
+      }
+      #graphic-root .art[data-color="gain"] {
+        color: var(--color-gain);
+      }
+      #graphic-root .art svg {
+        display: block;
+        width: 100%;
+        height: 100%;
+        overflow: visible;
+      }
+    </style>
+  </head>
+  <body>
+    <div
+      id="graphic-root"
+      data-composition-id="graphic-stamp"
+      data-width="1920"
+      data-height="1080"
+      data-start="0"
+      data-duration="4"
+    >
+      <div class="place" data-position="top-left" data-size="medium">
+        <div class="art" data-color="gold"></div>
+      </div>
+    </div>
+
+    <script>
+      (function () {
+        "use strict";
+
+        // Where the picture sits inside its square, so that a corner graphic touches the safe margins.
+        var ALIGN = {
+          "top-left": "xMinYMin",
+          "top-right": "xMaxYMin",
+          "bottom-left": "xMinYMax",
+          "bottom-right": "xMaxYMax",
+          center: "xMidYMid",
+        };
+        var SIZES = ["small", "medium", "large"];
+        var COLORS = ["gold", "gold_dim", "paper", "paper_aged", "ink", "oxblood", "verdigris", "slate", "loss", "gain"];
+        var ANIMATIONS = ["stamp", "draw-on", "fade"];
+        // What a vector may hold: the elements src/hyperframes_mcp/motion/vectors.py allows (lower case).
+        var DRAWING = [
+          "svg", "g", "defs", "symbol", "use", "path", "circle", "ellipse", "line", "polyline", "polygon", "rect",
+          "lineargradient", "radialgradient", "stop", "clippath", "mask", "title", "desc",
+        ];
+        var SHAPES = "path,circle,ellipse,line,polyline,polygon,rect";
+        var UNDRAWN = ["defs", "symbol", "clippath", "mask"];
+
+        // The idiom of the other blocks: the declared defaults first, then what HyperFrames resolved for this
+        // composition (declared defaults plus the mount's overrides). A mounted composition's <html> is not in
+        // the page, so there the second step carries the defaults.
+        function readVars() {
+          var out = {};
+          var raw = document.documentElement.getAttribute("data-composition-variables");
+          if (raw) {
+            JSON.parse(raw).forEach(function (d) {
+              out[d.id] = d.default;
+            });
+          }
+          var hf = window.__hyperframes;
+          var overrides =
+            hf && typeof hf.getVariables === "function" ? hf.getVariables() : window.__hfVariables;
+          if (overrides && typeof overrides === "object") {
+            for (var key in overrides) if (overrides[key] !== undefined) out[key] = overrides[key];
+          }
+          return out;
+        }
+
+        var V = readVars();
+        // No literal fallbacks: a missing or wrong variable fails the render rather than drawing a wrong frame.
+        function oneOf(name, list) {
+          if (list.indexOf(V[name]) < 0) {
+            throw new Error("graphic-stamp: " + name + " must be " + list.join(", ") + ", got " + V[name]);
+          }
+          return V[name];
+        }
+        var file = typeof V.svg === "string" ? V.svg.trim() : "";
+        if (!/^[A-Za-z0-9_][A-Za-z0-9_\-\/.]*\.svg$/i.test(file) || file.indexOf("..") >= 0 || file.indexOf("//") >= 0) {
+          throw new Error("graphic-stamp: svg must be a path to an .svg file inside the project, got " + V.svg);
+        }
+        var position = oneOf("position", Object.keys(ALIGN));
+        var size = oneOf("size", SIZES);
+        var color = oneOf("color", COLORS);
+        var animation = oneOf("animation", ANIMATIONS);
+
+        var rootEl = document.querySelector("#graphic-root");
+        var placeEl = rootEl.querySelector(".place");
+        var artEl = rootEl.querySelector(".art");
+        placeEl.setAttribute("data-position", position);
+        placeEl.setAttribute("data-size", size);
+        artEl.setAttribute("data-color", color);
+
+        function token(name) {
+          var value = getComputedStyle(rootEl).getPropertyValue(name).trim();
+          if (!value) throw new Error("tokens.css is not loaded: " + name + " is empty");
+          return value;
+        }
+        function seconds(name) {
+          return Number.parseFloat(token(name));
+        }
+        var enter = seconds("--dur-enter");
+        var exit = seconds("--dur-exit");
+        var micro = seconds("--dur-micro");
+        // The slot is durationSeconds: every entrance ends at the enter time, then it holds for at least the
+        // shortest reading time, and the fade out ends at the slot's end; a shorter slot fails the render.
+        var duration = Number.parseFloat(V.durationSeconds);
+        var needed = enter + seconds("--dur-read-min") + exit;
+        if (!Number.isFinite(duration) || duration + 1e-6 < needed) {
+          throw new Error(
+            "graphic-stamp: durationSeconds " + V.durationSeconds + " is shorter than the " +
+              needed.toFixed(2) + " s it needs (entrance, hold, fade out)",
+          );
+        }
+
+        function each(list, fn) {
+          Array.prototype.slice.call(list).forEach(fn);
+        }
+        // the root and every element under it
+        function everything(svg) {
+          return [svg].concat(Array.prototype.slice.call(svg.querySelectorAll("*")));
+        }
+
+        // The file was checked when it was saved; it is read again here, as the agent can write the project's files.
+        function clean(svg) {
+          everything(svg).forEach(function (el) {
+            if (el !== svg && DRAWING.indexOf(String(el.localName).toLowerCase()) < 0) {
+              el.parentNode.removeChild(el);
+              return;
+            }
+            each(el.attributes, function (attr) {
+              var name = attr.name.toLowerCase();
+              var value = String(attr.value).trim();
+              var outside =
+                ((name === "href" || name === "xlink:href") && value.charAt(0) !== "#") ||
+                /url\(\s*['"]?\s*[^#'"\s]/i.test(value);
+              if (name.indexOf("on") === 0 || name === "style" || /javascript:|data:/i.test(value) || outside) {
+                el.removeAttribute(attr.name);
+              }
+            });
+          });
+        }
+
+        // Two graphics on screen at once may both define #g: every id gets a number of its own, and so do its uses.
+        function scopeIds(svg) {
+          window.__graphicStampIds = (window.__graphicStampIds || 0) + 1;
+          var prefix = "gs" + window.__graphicStampIds + "-";
+          var ids = {};
+          each(svg.querySelectorAll("[id]"), function (el) {
+            ids[el.getAttribute("id")] = prefix + el.getAttribute("id");
+          });
+          everything(svg).forEach(function (el) {
+            each(el.attributes, function (attr) {
+              var value = attr.value.replace(/url\(\s*#([^)\s]+)\s*\)/g, function (all, id) {
+                return ids[id] ? "url(#" + ids[id] + ")" : all;
+              });
+              if (/^(xlink:)?href$/i.test(attr.name) && ids[value.trim().slice(1)]) {
+                value = "#" + ids[value.trim().slice(1)];
+              }
+              if (attr.name === "id") value = ids[value];
+              if (value !== attr.value) el.setAttribute(attr.name, value);
+            });
+          });
+        }
+
+        // The shapes that draw a stroke: their own stroke, else the nearest ancestor's, is not "none".
+        function stroked(svg) {
+          return Array.prototype.filter.call(svg.querySelectorAll(SHAPES), function (el) {
+            var found = null;
+            for (var node = el; node; node = node.parentNode) {
+              if (UNDRAWN.indexOf(String(node.localName).toLowerCase()) >= 0) return false;
+              var own = node.getAttribute ? node.getAttribute("stroke") : null;
+              if (own && found === null) found = own;
+              if (node === svg) break;
+            }
+            return found !== null && found !== "none";
+          });
+        }
+
+        // How the art arrives, as the from and to values of one tween over the enter time. A vector that draws on is
+        // the exception: its strokes draw themselves (below), and a shape that is only filled is wiped in from the left.
+        function entrance() {
+          if (animation === "stamp") {
+            return [
+              { opacity: 0, scale: 1.3, rotation: -6 },
+              { opacity: 1, scale: 1, rotation: 0, ease: token("--ease-emphasis") },
+            ];
+          }
+          if (animation === "fade") return [{ opacity: 0 }, { opacity: 1, ease: token("--ease-enter") }];
+          return [
+            { opacity: 1, clipPath: "inset(-4% 100% -4% 0%)" },
+            { opacity: 1, clipPath: "inset(-4% -4% -4% 0%)", ease: token("--ease-enter") },
+          ];
+        }
+
+        function build(svg) {
+          var tl = gsap.timeline({ paused: true });
+          var strokes = animation === "draw-on" ? stroked(svg) : [];
+          if (strokes.length === 0) {
+            var pair = entrance();
+            pair[1].duration = enter;
+            tl.fromTo(artEl, pair[0], pair[1], 0);
+          } else {
+            // the art is there at once; the strokes start one after the other within one micro step and all end
+            // with the enter time
+            gsap.set(artEl, { opacity: 1 });
+            var spread = strokes.length > 1 ? micro : 0;
+            strokes.forEach(function (el, i) {
+              el.setAttribute("pathLength", "1");
+              el.setAttribute("stroke-dasharray", "1 2");
+              tl.fromTo(
+                el,
+                { strokeDashoffset: 1.02 },
+                { strokeDashoffset: 0, duration: enter - spread, ease: token("--ease-move") },
+                spread * (i / Math.max(strokes.length - 1, 1)),
+              );
+            });
+          }
+          tl.fromTo(
+            placeEl,
+            { opacity: 1 },
+            { opacity: 0, duration: exit, ease: token("--ease-exit"), immediateRender: false },
+            duration - exit,
+          );
+          window.__timelines = window.__timelines || {};
+          window.__timelines["graphic-stamp"] = tl;
+        }
+
+        // The vector comes from a file, so the timeline is built once it is in and registered then (the
+        // async-setup contract of HyperFrames); every check on the variables above has thrown first.
+        fetch(file)
+          .then(function (response) {
+            if (!response.ok) throw new Error("graphic-stamp: " + file + " answered " + response.status);
+            return response.text();
+          })
+          .then(function (text) {
+            var parsed = new DOMParser().parseFromString(text, "image/svg+xml");
+            var svg = parsed.documentElement;
+            if (!svg || String(svg.localName).toLowerCase() !== "svg" || parsed.getElementsByTagName("parsererror").length) {
+              throw new Error("graphic-stamp: " + file + " is not an SVG file");
+            }
+            artEl.appendChild(svg);
+            clean(svg);
+            scopeIds(svg);
+            svg.removeAttribute("width");
+            svg.removeAttribute("height");
+            svg.setAttribute("preserveAspectRatio", ALIGN[position] + " meet");
+            build(svg);
+          });
+      })();
+    </script>
+  </body>
+</html>

@@ -1,0 +1,17 @@
+{
+  "name": "hyperframes-mcp-node",
+  "private": true,
+  "version": "0.1.0",
+  "description": "The pinned HyperFrames CLI and the browser libraries the block library draws with. Installed by `hyperframes-mcp setup`; nothing imports it: the Python code runs the CLI from node_modules.",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "d3": "7.9.0",
+    "gsap": "3.14.2",
+    "hyperframes": "0.8.139",
+    "topojson-client": "3.1.0",
+    "world-atlas": "2.0.2"
+  }
+}

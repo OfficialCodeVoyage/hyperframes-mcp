@@ -1,0 +1,238 @@
+<!--
+  Copyright 2026 the hyperframes-mcp contributors. Hand-written for the motion library (src/hyperframes_mcp/motion); it shares no code
+  with the HyperFrames catalog. The idea (a short gold rule, a date, a dark soft plate behind them in a corner)
+  follows the date of an earlier prototype; its typewriter
+  per-character timers and text shadow are replaced by a clip-path reveal and a plate that is dark enough to read on.
+
+  A date over a photograph, in a corner inside the safe zone: a gold rule draws from the left (scaleX), the date
+  in the display face is revealed left to right by a clip-path, both held for at least the reading time, then a
+  faster fade out. Gold on the night ground is 8.7:1; the plate behind them is the scrim token at 90% (and gold
+  stays above 4.5:1 on it with the plate over pure white, tests/motion/test_date_stamp.py).
+  Every colour, size, duration and ease comes from tokens.css (assets/motion/tokens.json).
+-->
+<!doctype html>
+<html
+  lang="en"
+  data-composition-variables='[
+    {"id":"durationSeconds","type":"number","label":"Seconds on screen, reveal and fade out included","default":5,"min":3,"max":14,"step":0.1,"unit":"s"},
+    {"id":"text","type":"string","label":"The date","default":"April 12, 1945","maxLength":30},
+    {"id":"position","type":"enum","label":"Corner of the frame","default":"bottom-left","options":[{"value":"bottom-left","label":"Bottom left"},{"value":"top-left","label":"Top left"},{"value":"top-right","label":"Top right"},{"value":"bottom-right","label":"Bottom right"}]}
+  ]'
+>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <title>Date stamp</title>
+    <link rel="stylesheet" href="tokens.css" />
+    <script src="vendor/gsap.min.js"></script>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        width: 1920px;
+        height: 1080px;
+        overflow: hidden;
+        background: transparent;
+      }
+      #stamp-root {
+        position: relative;
+        width: 1920px;
+        height: 1080px;
+        overflow: hidden;
+      }
+      #stamp-root .stamp {
+        position: absolute;
+        width: max-content;
+        max-width: calc(100% - var(--safe-left) - var(--safe-right));
+      }
+      #stamp-root .stamp[data-position="bottom-left"] {
+        left: var(--safe-left);
+        bottom: var(--safe-bottom);
+      }
+      #stamp-root .stamp[data-position="top-left"] {
+        left: var(--safe-left);
+        top: var(--safe-top);
+      }
+      #stamp-root .stamp[data-position="top-right"] {
+        right: var(--safe-right);
+        top: var(--safe-top);
+      }
+      #stamp-root .stamp[data-position="bottom-right"] {
+        right: var(--safe-right);
+        bottom: var(--safe-bottom);
+      }
+      /* The plate: an ellipse larger than the stamp, flat dark over the text (a date of up to 30 characters has
+         its far corner at 0.7 of the radius) and falling away in small steps so that no edge shows. */
+      #stamp-root .scrim {
+        position: absolute;
+        inset: -230px -380px -230px -320px;
+        background: radial-gradient(
+          ellipse closest-side at 50% 50%,
+          color-mix(in srgb, var(--color-scrim) 90%, transparent) 0%,
+          color-mix(in srgb, var(--color-scrim) 90%, transparent) 70%,
+          color-mix(in srgb, var(--color-scrim) 80%, transparent) 76%,
+          color-mix(in srgb, var(--color-scrim) 60%, transparent) 82%,
+          color-mix(in srgb, var(--color-scrim) 38%, transparent) 88%,
+          color-mix(in srgb, var(--color-scrim) 16%, transparent) 94%,
+          transparent 100%
+        );
+        opacity: 0;
+      }
+      #stamp-root .rule {
+        position: relative;
+        width: 132px;
+        height: 3px;
+        margin-bottom: 18px;
+        background: var(--color-gold);
+        transform-origin: 0 50%;
+        transform: scaleX(0);
+      }
+      #stamp-root .date {
+        position: relative;
+        font-family: var(--font-display);
+        font-weight: 500;
+        font-size: var(--size-title);
+        line-height: 1.15;
+        letter-spacing: 0.01em;
+        font-variant-numeric: lining-nums tabular-nums;
+        color: var(--color-gold);
+        clip-path: inset(-12px 100% -12px 0%);
+      }
+    </style>
+  </head>
+  <body>
+    <div
+      id="stamp-root"
+      data-composition-id="date-stamp"
+      data-width="1920"
+      data-height="1080"
+      data-start="0"
+      data-duration="5"
+    >
+      <div class="stamp" data-position="bottom-left">
+        <div class="scrim"></div>
+        <div class="rule"></div>
+        <div class="date"></div>
+      </div>
+    </div>
+
+    <script>
+      (function () {
+        "use strict";
+
+        // logic:begin
+        // The arithmetic of the slot, with no DOM in it. The page runs it for real, and the composer's preflight
+        // (src/hyperframes_mcp/motion/preflight.py) runs the same text in Node, so a shot list is refused before a render can fail.
+
+        function dateText(V) {
+          // No literal fallbacks: a missing variable fails the render rather than drawing a wrong frame.
+          if (typeof V.text !== "string" || V.text.trim().length === 0) {
+            throw new Error("date-stamp: the text variable is missing or empty");
+          }
+          return V.text.trim();
+        }
+
+        // The shortest slot: the date starts one micro step after the rule and the plate (the group's stagger is
+        // one step), is revealed, stays whole for the reading time, then fades out. A slot shorter than this fails
+        // the render instead of cutting the date short. tok(name) is the number of a token custom property.
+        function minSlot(V, tok) {
+          var words = dateText(V).split(" ").length;
+          var readSeconds = tok("--dur-read-min") + tok("--dur-read-per-word") * words;
+          return tok("--dur-micro") + tok("--dur-enter") + readSeconds + tok("--dur-exit");
+        }
+        // logic:end
+
+        // The idiom of the other blocks: the declared defaults first, then what HyperFrames resolved for this
+        // composition (declared defaults plus the mount's overrides). A mounted composition's <html> is not in
+        // the page, so there the second step carries the defaults.
+        function readVars() {
+          var out = {};
+          var raw = document.documentElement.getAttribute("data-composition-variables");
+          if (raw) {
+            JSON.parse(raw).forEach(function (d) {
+              out[d.id] = d.default;
+            });
+          }
+          var hf = window.__hyperframes;
+          var overrides =
+            hf && typeof hf.getVariables === "function" ? hf.getVariables() : window.__hfVariables;
+          if (overrides && typeof overrides === "object") {
+            for (var key in overrides) if (overrides[key] !== undefined) out[key] = overrides[key];
+          }
+          return out;
+        }
+
+        var V = readVars();
+        var text = dateText(V);
+        var position = V.position;
+        var corners = ["bottom-left", "top-left", "top-right", "bottom-right"];
+        if (corners.indexOf(position) < 0) {
+          throw new Error("date-stamp: position must be bottom-left, top-left, top-right or bottom-right, got " + position);
+        }
+        var rootEl = document.querySelector("#stamp-root");
+        var stampEl = rootEl.querySelector(".stamp");
+        var scrimEl = rootEl.querySelector(".scrim");
+        var ruleEl = rootEl.querySelector(".rule");
+        var dateEl = rootEl.querySelector(".date");
+        stampEl.setAttribute("data-position", position);
+        dateEl.textContent = text;
+
+        function token(name) {
+          var value = getComputedStyle(rootEl).getPropertyValue(name).trim();
+          if (!value) throw new Error("tokens.css is not loaded: " + name + " is empty");
+          return value;
+        }
+        function seconds(name) {
+          return Number.parseFloat(token(name));
+        }
+        var enter = seconds("--dur-enter");
+        var exit = seconds("--dur-exit");
+        // the date starts one micro step after the rule and the plate: the group's stagger is one step
+        var step = seconds("--dur-micro");
+        // The slot is durationSeconds: everything starts at 0 and the fade out ends at the slot's end; a slot
+        // shorter than minSlot (the reveal, the reading time, the fade out) fails the render.
+        var duration = Number.parseFloat(V.durationSeconds);
+        var needed = minSlot(V, seconds);
+        if (!Number.isFinite(duration) || duration + 1e-6 < needed) {
+          throw new Error(
+            "date-stamp: durationSeconds " + V.durationSeconds + " is shorter than the " +
+              needed.toFixed(2) + " s it needs (reveal, reading time, fade out)",
+          );
+        }
+
+        var tl = gsap.timeline({ paused: true });
+        tl.fromTo(
+          scrimEl,
+          { opacity: 0 },
+          { opacity: 1, duration: enter, ease: token("--ease-enter") },
+          0,
+        );
+        tl.fromTo(
+          ruleEl,
+          { scaleX: 0 },
+          { scaleX: 1, duration: enter, ease: token("--ease-move") },
+          0,
+        );
+        tl.fromTo(
+          dateEl,
+          { clipPath: "inset(-12px 100% -12px 0%)" },
+          { clipPath: "inset(-12px -2% -12px 0%)", duration: enter, ease: token("--ease-enter") },
+          step,
+        );
+        tl.fromTo(
+          stampEl,
+          { opacity: 1 },
+          { opacity: 0, duration: exit, ease: token("--ease-exit"), immediateRender: false },
+          duration - exit,
+        );
+
+        window.__timelines = window.__timelines || {};
+        window.__timelines["date-stamp"] = tl;
+      })();
+    </script>
+  </body>
+</html>

@@ -1,0 +1,683 @@
+<!--
+  Copyright 2026 the hyperframes-mcp contributors. Hand-written for the motion library (src/hyperframes_mcp/motion), to the component
+  contract in docs/motion-library.md. The idea follows the typed inventory of an earlier prototype, rebuilt: that file types every character with a timer, hard-codes sizes and
+  positions and draws on footage; this one is a paper sheet on the night ground.
+
+  A paper ledger sheet (paper, ink, faint ruled lines, an oxblood total line, Courier Prime in tabular figures,
+  numbers right-aligned) that arrives and fills row by row: each row is revealed by a left-to-right clip-path, at
+  the times the narration says it (rowTimes) or evenly spaced; the total draws its rule with scaleX and then its
+  row; an optional big figure in gold lands last with the emphasis ease and holds. The time plan, the fit of the
+  rows and the size of the big figure are functions between the logic markers (tests/motion/test_ledger.py runs
+  them). Every colour, size, duration and ease comes from tokens.css.
+-->
+<!doctype html>
+<html
+  lang="en"
+  data-composition-variables='[
+    {"id":"durationSeconds","type":"number","label":"Seconds on screen, arrival and fade out included","default":12,"min":6,"max":40,"step":0.1,"unit":"s"},
+    {"id":"title","type":"string","label":"Heading of the sheet","default":"Vault inventory","maxLength":24},
+    {"id":"rows","type":"string","label":"Rows as JSON, at most 8: [{\"label\":\"Gold bars\",\"value\":\"8,198\",\"unit\":\"bars\"}]","default":"[{\"label\":\"Gold bars\",\"value\":\"8,198\",\"unit\":\"bars\"},{\"label\":\"Silver ingots\",\"value\":\"1,420\",\"unit\":\"ingots\"},{\"label\":\"Banknote sacks\",\"value\":\"711\",\"unit\":\"sacks\"},{\"label\":\"Art crates\",\"value\":\"55\",\"unit\":\"crates\"}]"},
+    {"id":"total","type":"string","label":"Total line as JSON: {\"label\":\"Items counted\",\"value\":\"10,384\"}","default":"{\"label\":\"Items counted\",\"value\":\"10,384\"}"},
+    {"id":"bigFigure","type":"string","label":"Big figure as JSON {\"value\":\"98.6%\",\"caption\":\"...\"}, or empty for none","default":"{\"value\":\"98.6%\",\"caption\":\"of the gold, per the final balance sheet\"}"},
+    {"id":"rowTimes","type":"string","label":"Seconds in the slot at which each row appears, as a JSON list, or empty to space them evenly","default":""}
+  ]'
+>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <title>Ledger</title>
+    <link rel="stylesheet" href="tokens.css" />
+    <script src="vendor/gsap.min.js"></script>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        width: 1920px;
+        height: 1080px;
+        overflow: hidden;
+        background: transparent;
+      }
+      #ledger-root {
+        position: relative;
+        width: 1920px;
+        height: 1080px;
+        overflow: hidden;
+      }
+      #ledger-root .stage {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+      }
+      /* A backing for the big figure, soft at its left edge: the figure reads on any shot. */
+      #ledger-root .dim {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        right: 0;
+        width: 48%;
+        background: linear-gradient(
+          to right,
+          transparent 0%,
+          color-mix(in srgb, var(--color-scrim) 12%, transparent) 4%,
+          color-mix(in srgb, var(--color-scrim) 38%, transparent) 9%,
+          color-mix(in srgb, var(--color-scrim) 68%, transparent) 16%,
+          color-mix(in srgb, var(--color-scrim) 82%, transparent) 25%,
+          color-mix(in srgb, var(--color-scrim) 82%, transparent) 100%
+        );
+        opacity: 0;
+      }
+      #ledger-root .layout {
+        position: absolute;
+        left: var(--safe-left);
+        right: var(--safe-right);
+        top: var(--safe-top);
+        bottom: var(--safe-bottom);
+        display: flex;
+        align-items: center;
+        gap: var(--gap);
+      }
+      #ledger-root .sheet {
+        flex: 0 0 var(--sheet-w);
+        padding: var(--pad-y) var(--pad-x);
+        background: var(--color-paper);
+        color: var(--color-ink);
+        opacity: 0;
+      }
+      #ledger-root .title {
+        height: var(--title-h);
+        font-family: var(--font-display);
+        font-weight: 600;
+        font-size: var(--size-subtitle);
+        line-height: var(--title-h);
+        white-space: nowrap;
+      }
+      #ledger-root .head-rule {
+        height: 3px;
+        margin-bottom: calc(var(--head-gap) - 3px);
+        background: var(--color-ink);
+      }
+      /* The faint ruled lines are the sheet's own: one line at the foot of every row, there before the rows are. */
+      #ledger-root .rows {
+        background-image: linear-gradient(
+          to bottom,
+          transparent calc(var(--row-h) - 2px),
+          color-mix(in srgb, var(--color-ink) 16%, transparent) calc(var(--row-h) - 2px)
+        );
+        background-size: 100% var(--row-h);
+      }
+      #ledger-root .row {
+        display: grid;
+        grid-template-columns: 1fr var(--value-w) var(--unit-w);
+        align-items: center;
+        height: var(--row-h);
+        font-family: var(--font-mono);
+        font-size: var(--size-ledger);
+        line-height: 1;
+        white-space: nowrap;
+        font-variant-numeric: tabular-nums;
+      }
+      #ledger-root .row .value {
+        text-align: right;
+        font-weight: 700;
+      }
+      #ledger-root .row .unit {
+        padding-left: 1ch;
+      }
+      #ledger-root .total {
+        margin-top: var(--total-gap);
+      }
+      #ledger-root .total-rule {
+        height: var(--rule-h);
+        background: var(--color-oxblood);
+        transform-origin: 0 50%;
+      }
+      #ledger-root .total-row {
+        display: flex;
+        align-items: center;
+        height: var(--row-h);
+        font-family: var(--font-mono);
+        font-weight: 700;
+        font-size: var(--size-ledger);
+        line-height: 1;
+        white-space: nowrap;
+        font-variant-numeric: tabular-nums;
+        color: var(--color-oxblood);
+      }
+      #ledger-root .total-row .t-label {
+        flex: 1 1 auto;
+      }
+      #ledger-root .total-row .t-value {
+        margin-right: var(--unit-w);
+        text-align: right;
+      }
+      #ledger-root .big {
+        flex: 1 1 0;
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        justify-content: center;
+      }
+      #ledger-root .big-value {
+        font-family: var(--font-display);
+        font-weight: 500;
+        font-size: var(--big-size);
+        line-height: 1;
+        color: var(--color-gold);
+        font-variant-numeric: tabular-nums;
+        font-feature-settings: "tnum" 1;
+        white-space: nowrap;
+        opacity: 0;
+      }
+      #ledger-root .big-rule {
+        width: 100%;
+        height: 3px;
+        margin: calc(var(--size-label) * 0.5) 0;
+        background: var(--color-gold);
+        transform-origin: 0 50%;
+      }
+      #ledger-root .big-caption {
+        max-width: 100%;
+        text-wrap: balance;
+        font-family: var(--font-label);
+        font-weight: 500;
+        font-size: var(--size-label);
+        line-height: 1.25;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--color-paper);
+        opacity: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <div
+      id="ledger-root"
+      data-composition-id="ledger"
+      data-width="1920"
+      data-height="1080"
+      data-start="0"
+      data-duration="12"
+    >
+      <div class="stage">
+        <div class="dim"></div>
+        <div class="layout">
+          <section class="sheet">
+            <h2 class="title"></h2>
+            <div class="head-rule"></div>
+            <div class="rows"></div>
+            <div class="total">
+              <div class="total-rule"></div>
+              <div class="total-row"><span class="t-label"></span><span class="t-value"></span></div>
+            </div>
+          </section>
+          <aside class="big">
+            <p class="big-value"></p>
+            <div class="big-rule"></div>
+            <p class="big-caption"></p>
+          </aside>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      (function () {
+        "use strict";
+
+        // logic:begin
+        // The arithmetic of the block, with no DOM in it: tests/motion/test_ledger.py runs these functions in Node.
+
+        var MAX_ROWS = 8;
+        var CHAR_EM = 0.6; // Courier Prime: every glyph is 0.6 em wide (assets/motion/fonts/FONTS.md)
+        var TITLE_EM = 0.62; // Newsreader semibold: a generous average advance per character
+        // Newsreader at weight 500 and the largest optical size, as the browser draws a figure this big (0.62 em digits,
+        // measured with fontTools; the default instance of the file says 0.55, which is narrower than what is drawn).
+        // Any other character counts 0.85 em (% is 0.81); the few printable ASCII characters wider than that are listed.
+        var BIG_EM = { ",": 0.25, ".": 0.25, M: 1.05, W: 1.05, "@": 0.91, m: 0.91 };
+        var BIG_DIGIT_EM = 0.63;
+        var BIG_OTHER_EM = 0.85;
+        var RULE_H = 4; // the total rule, px
+        var STAGGER = 0.25; // one line after the other, and the pause between the phases
+
+        function wordCount(text) {
+          return text.split(/\s+/).filter(Boolean).length;
+        }
+
+        // A variable that holds JSON: the text is parsed, a list or object passed by the host is used as it is,
+        // empty text or "null" means none.
+        function parseVar(raw, name) {
+          if (raw === undefined) throw new Error("ledger: the " + name + " variable is missing");
+          if (typeof raw !== "string") return raw;
+          var trimmed = raw.trim();
+          if (trimmed === "" || trimmed === "null") return null;
+          try {
+            return JSON.parse(trimmed);
+          } catch (error) {
+            throw new Error("ledger: the " + name + " variable is not valid JSON (" + error.message + ")");
+          }
+        }
+
+        function text(value, what, allowEmpty) {
+          var s = typeof value === "number" ? String(value) : value;
+          if (typeof s !== "string" || (!allowEmpty && s.trim() === "")) {
+            throw new Error("ledger: " + what + " is missing or empty");
+          }
+          return s.trim();
+        }
+
+        // What the block draws, checked: strings everywhere, no literal fallback for a missing field.
+        function normalize(raw) {
+          if (!Array.isArray(raw.rows) || raw.rows.length === 0) {
+            throw new Error("ledger: rows must be a list with at least one row");
+          }
+          var rows = raw.rows.map(function (row, i) {
+            var at = "row " + (i + 1);
+            if (!row || typeof row !== "object") {
+              throw new Error("ledger: " + at + " must be an object with label, value and unit");
+            }
+            return {
+              label: text(row.label, at + " label"),
+              value: text(row.value, at + " value"),
+              unit: row.unit === undefined || row.unit === null ? "" : text(row.unit, at + " unit", true),
+            };
+          });
+          var total = raw.total;
+          if (!total || typeof total !== "object") {
+            throw new Error("ledger: total must be an object with label and value");
+          }
+          var big = null;
+          if (raw.bigFigure !== null) {
+            if (typeof raw.bigFigure !== "object") {
+              throw new Error("ledger: bigFigure must be an object with value and caption, or empty");
+            }
+            big = {
+              value: text(raw.bigFigure.value, "the big figure value"),
+              caption: text(raw.bigFigure.caption, "the big figure caption", true),
+            };
+          }
+          var times = raw.rowTimes;
+          if (times !== null && !Array.isArray(times)) {
+            throw new Error("ledger: rowTimes must be a list of seconds, or empty");
+          }
+          return {
+            title: text(raw.title, "the title"),
+            rows: rows,
+            total: { label: text(total.label, "the total label"), value: text(total.value, "the total value") },
+            big: big,
+            rowTimes: times,
+          };
+        }
+
+        function longest(rows, key) {
+          return rows.reduce(function (n, r) {
+            return Math.max(n, r[key].length);
+          }, 0);
+        }
+
+        // The sheet's geometry from the type sizes and the safe zone, all in whole pixels. The sheet is as tall as its
+        // rows need; more rows than fit the safe height, or a text longer than its column, is an error that says so.
+        function layoutFor(p) {
+          var L = p.ledger;
+          var c = p.content;
+          var charW = CHAR_EM * L;
+          var rowH = Math.round(1.6 * L);
+          var padY = Math.round(0.8 * L);
+          var padX = Math.round(1.1 * L);
+          var titleH = Math.round(1.15 * p.subtitle);
+          var headGap = Math.round(0.6 * L);
+          var totalGap = Math.round(0.3 * L);
+          var gap = Math.round(1.4 * L);
+          var sheetW = Math.floor(0.64 * p.safeW);
+          var innerW = sheetW - 2 * padX;
+          var fixedH = 2 * padY + titleH + headGap + totalGap + RULE_H + rowH;
+          var maxRows = Math.min(MAX_ROWS, Math.floor((p.safeH - fixedH) / rowH));
+          if (c.rows.length > maxRows) {
+            throw new Error(
+              "ledger: " + c.rows.length + " rows do not fit the sheet: at most " + maxRows + " rows fit the safe zone",
+            );
+          }
+          var valueCols = longest(c.rows, "value");
+          var unitCols = longest(c.rows, "unit");
+          var valueW = valueCols * charW;
+          var unitW = unitCols > 0 ? (unitCols + 1) * charW : 0;
+          var labelMax = Math.floor((innerW - valueW - unitW - charW) / charW);
+          c.rows.forEach(function (r, i) {
+            if (r.label.length > labelMax) {
+              throw new Error(
+                "ledger: row " + (i + 1) + ' label "' + r.label + '" is ' + r.label.length +
+                  " characters; at most " + labelMax + " fit beside the numbers",
+              );
+            }
+          });
+          var titleMax = Math.floor(innerW / (TITLE_EM * p.subtitle));
+          if (c.title.length > titleMax) {
+            throw new Error("ledger: the title is " + c.title.length + " characters; at most " + titleMax + " fit");
+          }
+          var totalMax = Math.floor((innerW - unitW) / charW) - 1;
+          if (c.total.label.length + c.total.value.length > totalMax) {
+            throw new Error(
+              "ledger: the total line is " + (c.total.label.length + c.total.value.length) +
+                " characters; at most " + totalMax + " fit",
+            );
+          }
+          return {
+            charW: charW,
+            rowH: rowH,
+            padY: padY,
+            padX: padX,
+            titleH: titleH,
+            headGap: headGap,
+            totalGap: totalGap,
+            gap: gap,
+            sheetW: sheetW,
+            innerW: innerW,
+            sheetH: fixedH + c.rows.length * rowH,
+            maxRows: maxRows,
+            valueW: valueW,
+            unitW: unitW,
+            labelMax: labelMax,
+            columnW: p.safeW - sheetW - gap,
+          };
+        }
+
+        function bigEm(text) {
+          var em = 0;
+          for (var i = 0; i < text.length; i += 1) {
+            var ch = text[i];
+            em += BIG_EM[ch] !== undefined ? BIG_EM[ch] : /\d/.test(ch) ? BIG_DIGIT_EM : BIG_OTHER_EM;
+          }
+          return em;
+        }
+
+        // The size of the big figure: as large as the column allows, never under the minimum.
+        function bigSize(p) {
+          var em = bigEm(p.text);
+          var size = Math.floor(Math.min(p.max, p.width / em));
+          if (size < p.min) {
+            throw new Error(
+              'ledger: the big figure "' + p.text + '" does not fit its column at the minimum size of ' + p.min +
+                " px: use a shorter figure",
+            );
+          }
+          return size;
+        }
+
+        // The reading time of the last thing said, and what comes after the last row: the total rule and row, then the
+        // big figure and its minimum count when there is one.
+        function readingOf(p) {
+          return p.readMin + p.readPerWord * p.words;
+        }
+        function tailOf(p) {
+          return p.enter + STAGGER + STAGGER + p.enter + (p.hasBig ? STAGGER + p.cinMin : 0);
+        }
+
+        // The shortest slot for these rows, total and figure: the last row (at p.rowTimes, or the least spacing at which
+        // each wipe ends before the next starts, from the end of the arrival), the tail, the reading time and the fade
+        // out. Row times that cannot be written are an error whatever the slot.
+        function slotNeeded(p) {
+          var n = p.rows;
+          var last = p.enter + (n - 1) * p.micro;
+          if (p.rowTimes) {
+            if (p.rowTimes.length !== n) {
+              throw new Error("ledger: rowTimes lists " + p.rowTimes.length + " times for " + n + " rows");
+            }
+            p.rowTimes.forEach(function (t, i) {
+              if (typeof t !== "number" || !Number.isFinite(t)) {
+                throw new Error("ledger: rowTimes[" + i + "] is not a number of seconds");
+              }
+              if (i > 0 && t - p.rowTimes[i - 1] < p.micro - 1e-9) {
+                throw new Error(
+                  "ledger: rowTimes[" + i + "] is less than " + p.micro + " s after the row before: a row needs that long to be written",
+                );
+              }
+            });
+            if (p.rowTimes[0] < p.enter * 0.5 - 1e-9) {
+              throw new Error("ledger: the first row cannot appear before " + (p.enter * 0.5).toFixed(2) + " s, while the sheet is still arriving");
+            }
+            last = p.rowTimes[n - 1];
+          }
+          return last + tailOf(p) + readingOf(p) + p.exit;
+        }
+
+        // What the page and the composer's preflight read from the variables: the checked content.
+        function readContent(V) {
+          return normalize({
+            title: V.title,
+            rows: parseVar(V.rows, "rows"),
+            total: parseVar(V.total, "total"),
+            bigFigure: parseVar(V.bigFigure, "bigFigure"),
+            rowTimes: parseVar(V.rowTimes, "rowTimes"),
+          });
+        }
+
+        // The schedule input that comes from the content and the tokens (the page adds the duration). The last thing
+        // said holds for the reading time: the big figure and its caption when there is one, else the total line.
+        // tok(name) is the number of a token custom property.
+        function scheduleInput(content, tok) {
+          var big = content.big;
+          return {
+            rows: content.rows.length,
+            rowTimes: content.rowTimes,
+            hasBig: big !== null,
+            words: wordCount(big ? big.value + " " + big.caption : content.total.label + " " + content.total.value),
+            enter: tok("--dur-enter"),
+            exit: tok("--dur-exit"),
+            micro: tok("--dur-micro"),
+            cinMin: tok("--dur-cinematic-min"),
+            readMin: tok("--dur-read-min"),
+            readPerWord: tok("--dur-read-per-word"),
+          };
+        }
+
+        function minSlot(V, tok) {
+          return slotNeeded(scheduleInput(readContent(V), tok));
+        }
+
+        // When everything happens in a slot of p.duration seconds. The rows come first (at p.rowTimes, or evenly spaced
+        // from the end of the arrival), each wipe ends before the next starts, so one row moves at a time; then the total
+        // rule, the total row, and the big figure last. What was said last holds for the reading time before the fade out.
+        function schedule(p) {
+          var n = p.rows;
+          var reading = readingOf(p);
+          var tail = tailOf(p);
+          var exitAt = p.duration - p.exit;
+          var needed = slotNeeded(p);
+          if (!(p.duration + 1e-6 >= needed)) {
+            throw new Error(
+              "ledger: durationSeconds " + p.duration + " is too short for the rows, the total" +
+                (p.hasBig ? ", the big figure" : "") + " and the " + reading.toFixed(1) + " s of reading time: it needs at least " +
+                needed.toFixed(2) + " s",
+            );
+          }
+          var times;
+          if (p.rowTimes) {
+            times = p.rowTimes;
+          } else {
+            var spare = exitAt - reading - tail - p.enter;
+            var step = n > 1 ? Math.min(p.cinMin, spare / (n - 1)) : 0;
+            times = [];
+            for (var i = 0; i < n; i += 1) times.push(p.enter + i * step);
+          }
+          var rows = times.map(function (at, i) {
+            return { at: at, dur: i < n - 1 ? Math.min(p.enter, times[i + 1] - at) : p.enter };
+          });
+          var ruleAt = times[n - 1] + p.enter + STAGGER;
+          var totalAt = ruleAt + STAGGER;
+          var totalEnd = totalAt + p.enter;
+          var bigAt = p.hasBig ? totalEnd + STAGGER : null;
+          return {
+            rows: rows,
+            ruleAt: ruleAt,
+            totalAt: totalAt,
+            bigAt: bigAt,
+            captionAt: p.hasBig ? bigAt + STAGGER : null,
+            holdFrom: p.hasBig ? bigAt + p.cinMin : totalEnd,
+            exitAt: exitAt,
+          };
+        }
+        // logic:end
+
+        // The idiom of the other blocks: the declared defaults first, then what HyperFrames resolved for this
+        // composition (declared defaults plus the mount's overrides). A mounted composition's <html> is not in
+        // the page, so there the second step carries the defaults.
+        function readVars() {
+          var out = {};
+          var raw = document.documentElement.getAttribute("data-composition-variables");
+          if (raw) {
+            JSON.parse(raw).forEach(function (d) {
+              out[d.id] = d.default;
+            });
+          }
+          var hf = window.__hyperframes;
+          var overrides =
+            hf && typeof hf.getVariables === "function" ? hf.getVariables() : window.__hfVariables;
+          if (overrides && typeof overrides === "object") {
+            for (var key in overrides) if (overrides[key] !== undefined) out[key] = overrides[key];
+          }
+          return out;
+        }
+
+        var V = readVars();
+        // No literal fallbacks: a missing or wrong variable fails the render rather than drawing a wrong frame.
+        var content = readContent(V);
+
+        var rootEl = document.querySelector("#ledger-root");
+        function token(name) {
+          var value = getComputedStyle(rootEl).getPropertyValue(name).trim();
+          if (!value) throw new Error("tokens.css is not loaded: " + name + " is empty");
+          return value;
+        }
+        function number(name) {
+          return Number.parseFloat(token(name));
+        }
+        var enter = number("--dur-enter");
+        var exit = number("--dur-exit");
+        var safeW = Number.parseFloat(rootEl.getAttribute("data-width")) - number("--safe-left") - number("--safe-right");
+        var safeH = Number.parseFloat(rootEl.getAttribute("data-height")) - number("--safe-top") - number("--safe-bottom");
+
+        var layout = layoutFor({
+          content: content,
+          ledger: number("--size-ledger"),
+          subtitle: number("--size-subtitle"),
+          safeW: safeW,
+          safeH: safeH,
+        });
+        var px = function (n) {
+          return n + "px";
+        };
+        rootEl.style.setProperty("--row-h", px(layout.rowH));
+        rootEl.style.setProperty("--rule-h", px(RULE_H));
+        rootEl.style.setProperty("--pad-y", px(layout.padY));
+        rootEl.style.setProperty("--pad-x", px(layout.padX));
+        rootEl.style.setProperty("--title-h", px(layout.titleH));
+        rootEl.style.setProperty("--head-gap", px(layout.headGap));
+        rootEl.style.setProperty("--total-gap", px(layout.totalGap));
+        rootEl.style.setProperty("--gap", px(layout.gap));
+        rootEl.style.setProperty("--sheet-w", px(layout.sheetW));
+        rootEl.style.setProperty("--value-w", px(layout.valueW));
+        rootEl.style.setProperty("--unit-w", px(layout.unitW));
+
+        var stageEl = rootEl.querySelector(".stage");
+        var dimEl = rootEl.querySelector(".dim");
+        var sheetEl = rootEl.querySelector(".sheet");
+        var rowsEl = rootEl.querySelector(".rows");
+        var totalRuleEl = rootEl.querySelector(".total-rule");
+        var totalRowEl = rootEl.querySelector(".total-row");
+        var bigEl = rootEl.querySelector(".big");
+        var bigValueEl = rootEl.querySelector(".big-value");
+        var bigRuleEl = rootEl.querySelector(".big-rule");
+        var bigCaptionEl = rootEl.querySelector(".big-caption");
+
+        rootEl.querySelector(".title").textContent = content.title;
+        var rowEls = content.rows.map(function (row) {
+          var el = document.createElement("div");
+          el.className = "row";
+          ["label", "value", "unit"].forEach(function (part) {
+            var cell = document.createElement("span");
+            cell.className = part;
+            cell.textContent = row[part];
+            el.appendChild(cell);
+          });
+          rowsEl.appendChild(el);
+          return el;
+        });
+        rootEl.querySelector(".t-label").textContent = content.total.label;
+        rootEl.querySelector(".t-value").textContent = content.total.value;
+
+        var big = content.big;
+        if (big) {
+          var titleSize = number("--size-title");
+          var bigPx = bigSize({ text: big.value, width: layout.columnW, max: Math.round(titleSize * 2.2), min: titleSize });
+          rootEl.style.setProperty("--big-size", px(bigPx));
+          bigValueEl.textContent = big.value;
+          bigCaptionEl.textContent = big.caption;
+        } else {
+          // a sheet without a big figure draws neither the figure nor its backing
+          bigEl.remove();
+          dimEl.remove();
+        }
+
+        var duration = Number.parseFloat(V.durationSeconds);
+        var planParams = scheduleInput(content, number);
+        planParams.duration = duration;
+        var plan = schedule(planParams);
+        var easeEnter = token("--ease-enter");
+
+        var tl = gsap.timeline({ paused: true });
+
+        // The sheet arrives on the ground.
+        tl.fromTo(sheetEl, { opacity: 0, y: 24 }, { opacity: 1, y: 0, duration: enter, ease: easeEnter }, 0);
+        // The rows are written one at a time, left to right.
+        rowEls.forEach(function (el, i) {
+          tl.fromTo(
+            el,
+            { clipPath: "inset(0% 100% 0% 0%)" },
+            { clipPath: "inset(0% 0% 0% 0%)", duration: plan.rows[i].dur, ease: token("--ease-move") },
+            plan.rows[i].at,
+          );
+        });
+        // The total: its rule is drawn, then its row is written.
+        tl.fromTo(totalRuleEl, { scaleX: 0 }, { scaleX: 1, duration: enter, ease: easeEnter }, plan.ruleAt);
+        tl.fromTo(
+          totalRowEl,
+          { clipPath: "inset(0% 100% 0% 0%)" },
+          { clipPath: "inset(0% 0% 0% 0%)", duration: enter, ease: token("--ease-move") },
+          plan.totalAt,
+        );
+        // The big figure lands last with the emphasis ease and holds.
+        if (big) {
+          tl.fromTo(dimEl, { opacity: 0 }, { opacity: 1, duration: enter, ease: easeEnter }, plan.bigAt);
+          tl.fromTo(
+            bigValueEl,
+            { opacity: 0, y: 24 },
+            { opacity: 1, y: 0, duration: number("--dur-cinematic-min"), ease: token("--ease-emphasis") },
+            plan.bigAt,
+          );
+          tl.fromTo(bigRuleEl, { scaleX: 0 }, { scaleX: 1, duration: enter, ease: easeEnter }, plan.bigAt);
+          tl.fromTo(
+            bigCaptionEl,
+            { opacity: 0, y: 16 },
+            { opacity: 1, y: 0, duration: enter, ease: easeEnter },
+            plan.captionAt,
+          );
+        }
+        // The slot ends with the fade out.
+        tl.fromTo(
+          stageEl,
+          { opacity: 1 },
+          { opacity: 0, duration: exit, ease: token("--ease-exit"), immediateRender: false },
+          duration - exit,
+        );
+
+        window.__timelines = window.__timelines || {};
+        window.__timelines["ledger"] = tl;
+      })();
+    </script>
+  </body>
+</html>

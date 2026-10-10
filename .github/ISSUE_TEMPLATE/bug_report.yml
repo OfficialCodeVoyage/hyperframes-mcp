@@ -1,0 +1,35 @@
+name: Bug report
+description: Something does not work
+body:
+  - type: input
+    id: app_build
+    attributes:
+      label: HyperFrames app build
+      description: Printed by `hyperframes-mcp doctor` (for example b296)
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: hyperframes-mcp version
+      description: "`hyperframes-mcp --version` or the tag you installed"
+    validations:
+      required: true
+  - type: textarea
+    id: doctor
+    attributes:
+      label: Output of `hyperframes-mcp doctor`
+      description: It prints no key or token. Check before pasting.
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened, and what you expected
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
