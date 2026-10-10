@@ -5,6 +5,10 @@ All notable changes. The format follows [Keep a Changelog](https://keepachangelo
 
 ## [Unreleased]
 
+### Added
+- The README lists the 30 tools in a table generated from the server (checked by `scripts/gen_tools_doc.py --check`) and has a
+  section of prompts to copy into an AI agent.
+
 ## [0.1.0]
 
 First public release, extracted from a private video project.
