@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "hyperframes-mcp"
-version = "0.1.0"
+version = "0.1.1"
 description = "An MCP server that lets Claude Code edit a HyperFrames project while you edit it by hand in the HyperFrames desktop app (unofficial, not affiliated with HeyGen)."
 readme = "README.md"
 license = { text = "Apache-2.0" }

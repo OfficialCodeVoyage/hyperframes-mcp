@@ -1,8 +1,8 @@
 """Paid generation for an edit in the desktop app: one picture in the profile's style, or one clip made from a picture.
 
-The recipes are the ones the 8-minute gold video used: the repository's OpenAI image client at 2048x1152 with the
+The recipes: a picture drawn by the configured image provider (Nano Banana 2 on fal, at 1K or 2K) with the
 profile's style guide and a full-bleed note, and the fal image-to-video adapter with its per-video cap (here per
-project, its attempt log in ``<project>/.motion/``). A picture (a 7 MB PNG at 2048x1152) is fitted to the project's
+project, its attempt log in ``<project>/.motion/``). A picture (a PNG of several MB) is fitted to the project's
 canvas and kept as a JPEG of about 1 MB, or as a PNG when its file name says so; a clip comes back at 1280x720 and is
 scaled to the canvas before it is kept. The caller loads the keys first (``keys.load_keys``). Every file gets a record
 beside it (``<file>.json``: the AI credit, what made it, the request, for a picture the full prompt sent, and the price)

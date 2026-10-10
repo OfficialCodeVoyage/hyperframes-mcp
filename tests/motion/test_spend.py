@@ -230,10 +230,11 @@ async def test_confirming_a_picture_makes_it_in_the_projects_profile_and_records
     assert made["spent_usd"] == PICTURE_USD
     ref = str((project / "assets" / "door.png").resolve())
     assert sink.records == [
-        {"usd": PICTURE_USD, "ref": ref, "provider": "openai", "visual_type": "ai_image", "quote_id": quote.id}
+        {"usd": PICTURE_USD, "ref": ref, "provider": "fal", "visual_type": "ai_image", "quote_id": quote.id}
     ]
     (line,) = confirmed_lines(project)
     assert (line["usd"], line["quote"], line["ref"]) == (PICTURE_USD, quote.id, ref)
+    assert line["provider"] == "fal"  # pictures are drawn on fal now
 
 
 @pytest.mark.asyncio

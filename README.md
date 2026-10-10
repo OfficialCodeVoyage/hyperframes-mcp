@@ -12,7 +12,7 @@ First check what it needs and tell me what is missing, instead of installing any
 desktop app, Python 3.11 or newer, Node.js 22 or newer, ffmpeg with ffprobe, and uv (https://docs.astral.sh/uv/).
 
 Then run these one at a time and show me each result:
-  uv tool install "git+https://github.com/OfficialCodeVoyage/hyperframes-mcp@v0.1.0"
+  uv tool install "git+https://github.com/OfficialCodeVoyage/hyperframes-mcp@v0.1.1"
   hyperframes-mcp setup
   hyperframes-mcp register
   hyperframes-mcp doctor
@@ -122,7 +122,7 @@ The 30 tools of the `hyperframes-edit` server, as `/mcp` in Claude Code lists th
 ## Install
 
 ```bash
-uv tool install "git+https://github.com/OfficialCodeVoyage/hyperframes-mcp@v0.1.0"
+uv tool install "git+https://github.com/OfficialCodeVoyage/hyperframes-mcp@v0.1.1"
 hyperframes-mcp setup      # installs the pinned HyperFrames CLI and the block library's browser libraries (npm ci)
 hyperframes-mcp register   # adds the server to Claude Code at user scope
 hyperframes-mcp doctor     # says what works and what does not; prints no key or token
@@ -130,7 +130,7 @@ hyperframes-mcp doctor     # says what works and what does not; prints no key or
 
 Then quit the HyperFrames app completely (Cmd+Q) and open it again: the app's chat loads MCP servers only when it starts.
 
-`pipx install` works the same way. For the vector tracer add the extra: `"hyperframes-mcp[vectorize] @ git+https://github.com/OfficialCodeVoyage/hyperframes-mcp@v0.1.0"`.
+`pipx install` works the same way. For the vector tracer add the extra: `"hyperframes-mcp[vectorize] @ git+https://github.com/OfficialCodeVoyage/hyperframes-mcp@v0.1.1"`.
 
 **As a Claude Code plugin instead:** with the command installed as above, `/plugin marketplace add OfficialCodeVoyage/hyperframes-mcp`
 then `/plugin install hyperframes-edit --marketplace OfficialCodeVoyage/hyperframes-mcp`. Use one of the two ways, not both.

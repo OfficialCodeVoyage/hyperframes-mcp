@@ -1,6 +1,6 @@
 {
   "name": "hyperframes-edit",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Edit a HyperFrames project with Claude Code while you edit the same project by hand in the HyperFrames desktop app (unofficial, not affiliated with HeyGen).",
   "author": { "name": "OfficialCodeVoyage" },
   "homepage": "https://github.com/OfficialCodeVoyage/hyperframes-mcp",

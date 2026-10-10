@@ -2,7 +2,7 @@
 
 A key is read from the environment first, then from ``~/.hyperframes-mcp/config/.env`` (``KEY=value`` lines), then on
 macOS from the Keychain (a generic password whose service is ``hyperframes-mcp`` and whose account is the variable's
-name: ``security add-generic-password -s hyperframes-mcp -a OPENAI_API_KEY -w``). Nothing is printed and no key is ever
+name: ``security add-generic-password -s hyperframes-mcp -a FAL_KEY -w``). Nothing is printed and no key is ever
 put in a tool's answer.
 """
 

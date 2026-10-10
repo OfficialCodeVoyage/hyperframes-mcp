@@ -5,9 +5,16 @@ All notable changes. The format follows [Keep a Changelog](https://keepachangelo
 
 ## [Unreleased]
 
+## [0.1.1]
+
 ### Added
 - The README lists the 30 tools in a table generated from the server (checked by `scripts/gen_tools_doc.py --check`) and has a
-  section of prompts to copy into an AI agent.
+  section of prompts to copy into an AI agent, and an install prompt first.
+
+### Fixed
+- A picture's spend was logged with the provider `openai` (to the spend log and to a host's `SpendSink`) although pictures are
+  drawn on fal; it now names the provider the picture tools use.
+- Wording that still said pictures come from OpenAI.
 
 ## [0.1.0]
 

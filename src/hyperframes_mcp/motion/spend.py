@@ -89,8 +89,15 @@ CENTRAL_LOG: Path | None = None
 LOCK_WAIT_SECONDS = 900.0  # how long a confirm waits for a paid call already running on any project
 CLEAR_WAIT_SECONDS = 10.0  # how long the person's answer for a hold waits for one
 _EPSILON = 1e-9
-# provider and kind of what each paid call buys, as the spend log and a SpendSink name them
-_LEDGER = {"picture": ("openai", "ai_image"), "clip": ("fal", "ai_video")}
+# the kind of what each paid call buys, as the spend log and a SpendSink name it (the provider of a picture is the one
+# the picture tools draw with: generate.PICTURE_PROVIDER)
+_VISUAL_TYPE = {"picture": "ai_image", "clip": "ai_video"}
+_CLIP_PROVIDER = "fal"
+
+
+def _ledger(kind: str) -> tuple[str, str]:
+    """The provider and the visual type of a paid call of ``kind`` ("picture" or "clip")."""
+    return (_generate().PICTURE_PROVIDER if kind == "picture" else _CLIP_PROVIDER), _VISUAL_TYPE[kind]
 
 
 class SpendSink(Protocol):
@@ -484,7 +491,9 @@ def _totals(project: Path, now: datetime) -> _Totals:
     own_plain = [line for line in own_lines if line.get("quote") is None]
     folder_id = _folder_id(project)
     mine_plain = [line for line in central_lines if line.get("quote") is None and _is_project(line, project, folder_id)]
-    plain = own_plain if sum(line["usd"] for line in own_plain) >= sum(line["usd"] for line in mine_plain) else mine_plain
+    plain = (
+        own_plain if sum(line["usd"] for line in own_plain) >= sum(line["usd"] for line in mine_plain) else mine_plain
+    )
     attempts = _merged(project, own_lines, central_lines)
     mine = [*plain, *(line for line in attempts if line.get("status", "confirmed") != "released")]
     calls_of_server = _attempts(central_lines)  # every attempt counts as a call, the refused ones too
@@ -687,7 +696,9 @@ def _read_book(folder: Path) -> _QuoteBook:
     if any(key != quote.id for key, quote in book.quotes.items()):
         # the logs are keyed by the quote's id: an entry filed under another name would be a way to send a call as
         # an attempt of a quote that is already spent
-        raise SpendError(f"{path} cannot be read (an entry is filed under another quote's id); remove it and quote again")
+        raise SpendError(
+            f"{path} cannot be read (an entry is filed under another quote's id); remove it and quote again"
+        )
     return book
 
 
@@ -719,9 +730,7 @@ def _issue(project: Path, kind: str, prepared: _Prepared, save: bool) -> Quote:
     )
     if save:
         with _quote_book(project) as book:
-            book.quotes = {
-                key: kept for key, kept in book.quotes.items() if kept.expires_at > now
-            }
+            book.quotes = {key: kept for key, kept in book.quotes.items() if kept.expires_at > now}
             book.quotes[quote.id] = quote
     return quote
 
@@ -1081,7 +1090,11 @@ async def confirm(
         if stuck := [line for line in history.values() if line.get("status") in _HOLDING]:
             raise SpendError(
                 f"quote {quote.id} may have been billed already: its call "
-                + ("was interrupted after it was sent" if stuck[0]["status"] == "reserved" else "failed after it was sent")
+                + (
+                    "was interrupted after it was sent"
+                    if stuck[0]["status"] == "reserved"
+                    else "failed after it was sent"
+                )
                 + f", and its price stays counted. The person checks the provider's dashboard and runs "
                 f"`hyperframes-mcp spend clear {quote.id} --billed` or `--not-billed`; then quote again"
             )
@@ -1107,7 +1120,7 @@ async def confirm(
         if reason := frozen():  # the person may have frozen paid calls while the checks above waited
             raise SpendError(f"paid calls are frozen ({reason}); a price can still be quoted")
 
-        provider, visual_type = _LEDGER[quote.kind]
+        provider, visual_type = _ledger(quote.kind)
         attempt = max(history, default=0) + 1
         _hold(
             project, quote, fresh.price, "reserved", provider, f"held for {quote.kind} {quote.arguments['out']}",
@@ -1212,7 +1225,7 @@ async def record_spend(
 ) -> dict:
     """Record ``usd`` the project spent: in its spend log first (the limits count from there), then with the host's
     ``SpendSink`` when there is one. ``ref`` is the file it made, if any; ``provider`` and ``visual_type`` name what was
-    bought (``openai`` and ``ai_image``, ``fal`` and ``ai_video``).
+    bought (``fal`` and ``ai_image`` for a picture, ``fal`` and ``ai_video`` for a clip).
 
     The money is already spent, so a sink that fails does not raise: the spend still counts for the project's limits and
     the returned dict says so.
